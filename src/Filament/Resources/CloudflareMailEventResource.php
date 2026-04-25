@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources;
 
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource\Pages\ListCloudflareMailEvents;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource\Pages\ViewCloudflareMailEvent;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Config;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Privacy;
 use Filament\Forms\Components\DatePicker;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -18,6 +21,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * @extends resource<CloudflareMailEvent>
@@ -72,6 +76,7 @@ final class CloudflareMailEventResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->recordUrl(static fn (Model $model): string => self::getUrl('view', ['record' => $model]))
             ->columns([
                 TextColumn::make('occurred_at')->dateTime()->sortable(),
                 TextColumn::make('zone_name')->label('Zone')->searchable()->toggleable(),
@@ -123,7 +128,47 @@ final class CloudflareMailEventResource extends Resource
     {
         return [
             'index' => ListCloudflareMailEvents::route('/'),
+            'view' => ViewCloudflareMailEvent::route('/{record}'),
         ];
+    }
+
+    #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->components([
+            TextEntry::make('occurred_at')->dateTime()->label('Occurred at'),
+            TextEntry::make('zone_name')->label('Zone')->placeholder('Unknown zone'),
+            TextEntry::make('zone_id')->label('Zone ID'),
+            TextEntry::make('status')->badge()->placeholder('Unknown'),
+            TextEntry::make('event_type')->label('Event type')->badge()->placeholder('Unknown'),
+            TextEntry::make('from')->label('From')->formatStateUsing(static fn (?string $state): ?string => Privacy::email($state)),
+            TextEntry::make('to')->label('To')->formatStateUsing(static fn (?string $state): ?string => Privacy::email($state)),
+            TextEntry::make('subject')->label('Subject')->formatStateUsing(static fn (?string $state): ?string => Privacy::subject($state)),
+            TextEntry::make('sending_domain')->label('Sending domain')->placeholder('Unknown'),
+            TextEntry::make('message_id')->label('Message ID')->placeholder('Not available'),
+            TextEntry::make('session_id')->label('Session ID')->placeholder('Not available'),
+            TextEntry::make('error_cause')->label('Error cause')->placeholder('None'),
+            TextEntry::make('error_detail')->label('Error detail')->placeholder('None'),
+            TextEntry::make('dkim')->badge(),
+            TextEntry::make('dmarc')->badge(),
+            TextEntry::make('spf')->badge(),
+            TextEntry::make('arc')->badge(),
+            TextEntry::make('is_spam')->label('Spam')->badge(),
+            TextEntry::make('is_ndr')->label('NDR')->badge(),
+            TextEntry::make('raw')
+                ->label('Raw payload')
+                ->formatStateUsing(static function (?array $state): ?string {
+                    if ($state === null) {
+                        return null;
+                    }
+
+                    $encoded = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+                    return $encoded === false ? null : $encoded;
+                })
+                ->placeholder('Not available')
+                ->columnSpanFull(),
+        ]);
     }
 
     /**

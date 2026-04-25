@@ -7,6 +7,7 @@ use DrAliRagab\FilamentCloudflareMailMonitor\CloudflareMailMonitorPlugin;
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailDashboard;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource\Pages\ViewCloudflareMailEvent;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
@@ -15,6 +16,7 @@ use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSummary;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Privacy;
 use Filament\Panel;
+use Filament\Schemas\Schema;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\BaseFilter;
 use Filament\Tables\Table;
@@ -86,6 +88,8 @@ it('configures the email logs table and pages', function (): void {
 
     expect($configuredTable)->toBeInstanceOf(Table::class)
         ->and(CloudflareMailEventResource::getPages())->toHaveKey('index')
+        ->and(CloudflareMailEventResource::getPages())->toHaveKey('view')
+        ->and(CloudflareMailEventResource::getPages()['view']->getPage())->toBe(ViewCloudflareMailEvent::class)
         ->and($configuredTable->getFilters())->toHaveKeys(['zone_id', 'occurred_at'])
         ->and(CloudflareMailEventResource::zoneFilterOptions())->toBe([
             'zone-1' => 'example.com',
@@ -119,6 +123,24 @@ it('filters email logs by occurred date ranges', function (): void {
         ->all();
 
     expect($eventHashes)->toBe([str_repeat('b', 64)]);
+});
+
+it('links email logs to the detail page', function (): void {
+    $table = CloudflareMailEventResource::table(Table::make(Mockery::mock(HasTable::class)));
+
+    expect($table->hasCustomRecordUrl())->toBeTrue();
+});
+
+it('builds the email log infolist', function (): void {
+    $schema = CloudflareMailEventResource::infolist(Schema::make());
+    $components = $schema->getComponents();
+
+    $rawEntry = collect($components)->first(static fn ($component): bool => $component->getName() === 'raw');
+
+    expect($components)->not->toBeEmpty()
+        ->and($rawEntry)->not->toBeNull()
+        ->and($rawEntry->formatState(['foo' => 'bar']))->toBe("{\n    \"foo\": \"bar\"\n}")
+        ->and($rawEntry->formatState(null))->toBeNull();
 });
 
 it('formats private email data according to config', function (): void {
