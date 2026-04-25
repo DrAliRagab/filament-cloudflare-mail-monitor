@@ -7,6 +7,7 @@ use DrAliRagab\FilamentCloudflareMailMonitor\CloudflareMailMonitorPlugin;
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailDashboard;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource\Pages\ListCloudflareMailEvents;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource\Pages\ViewCloudflareMailEvent;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
@@ -129,6 +130,85 @@ it('links email logs to the detail page', function (): void {
     $table = CloudflareMailEventResource::table(Table::make(Mockery::mock(HasTable::class)));
 
     expect($table->hasCustomRecordUrl())->toBeTrue();
+});
+
+it('exposes a refresh action on the logs list page', function (): void {
+    $actions = Closure::bind(static fn (): array => app(ListCloudflareMailEvents::class)->getHeaderActions(), null, ListCloudflareMailEvents::class)();
+
+    expect($actions)->toHaveCount(1)
+        ->and($actions[0]->getName())->toBe('refresh')
+        ->and($actions[0]->getLabel())->toBe('Refresh logs');
+});
+
+it('refreshes the logs list page cache after fetching', function (): void {
+    config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.zones', [
+        ['id' => 'zone-1', 'name' => 'example.com'],
+    ]);
+
+    Http::fake([
+        'api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => [
+                'viewer' => [
+                    'zones' => [[
+                        'emailSendingAdaptive' => [[
+                            'datetime' => '2026-04-25T10:15:00Z',
+                            'messageId' => 'list-refresh',
+                        ]],
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    $listCloudflareMailEvents = app(ListCloudflareMailEvents::class);
+    $listCloudflareMailEvents->refreshCloudflareMailEvents();
+
+    expect(CloudflareMailEvent::query()->where('message_id', 'list-refresh')->exists())->toBeTrue();
+});
+
+it('exposes a refresh action on the log detail page', function (): void {
+    $actions = Closure::bind(static fn (): array => app(ViewCloudflareMailEvent::class)->getHeaderActions(), null, ViewCloudflareMailEvent::class)();
+
+    expect($actions)->toHaveCount(1)
+        ->and($actions[0]->getName())->toBe('refresh')
+        ->and($actions[0]->getLabel())->toBe('Refresh logs');
+});
+
+it('refreshes the current log record after fetching', function (): void {
+    config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.zones', [
+        ['id' => 'zone-1', 'name' => 'example.com'],
+    ]);
+
+    $cloudflareMailEvent = CloudflareMailEvent::query()->create([
+        'event_hash' => str_repeat('f', 64),
+        'zone_id' => 'zone-1',
+        'zone_name' => 'example.com',
+        'occurred_at' => CarbonImmutable::parse('2026-04-25T10:15:00Z'),
+        'message_id' => 'detail-refresh',
+    ]);
+
+    Http::fake([
+        'api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => [
+                'viewer' => [
+                    'zones' => [[
+                        'emailSendingAdaptive' => [[
+                            'datetime' => '2026-04-25T10:15:00Z',
+                            'messageId' => 'detail-refresh',
+                        ]],
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    $viewCloudflareMailEvent = app(ViewCloudflareMailEvent::class);
+    $viewCloudflareMailEvent->record = $cloudflareMailEvent;
+    $viewCloudflareMailEvent->refreshCloudflareMailEvents();
+
+    expect(CloudflareMailEvent::query()->where('message_id', 'detail-refresh')->exists())->toBeTrue();
 });
 
 it('builds the email log infolist', function (): void {

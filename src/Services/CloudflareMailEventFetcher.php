@@ -49,28 +49,41 @@ final readonly class CloudflareMailEventFetcher
      */
     private function eventsForZone(ConfiguredZone $configuredZone, DateRange $dateRange): array
     {
-        $data = $this->cloudflareGraphqlClient->query(RecentEmailEventsQuery::QUERY, [
-            'zoneTag' => $configuredZone->id,
-            'start' => $dateRange->start->toIso8601String(),
-            'end' => $dateRange->end->toIso8601String(),
-            'limit' => Config::integer('fetch.page_size', 500),
-        ]);
-
-        $events = Arr::get($data, 'viewer.zones.0.emailSendingAdaptive', []);
-
-        if (! is_array($events)) {
-            return [];
-        }
-
         $emailEvents = [];
+        $datetimeBefore = null;
+        $pageSize = Config::integer('fetch.page_size', 500);
+        $lastEvent = null;
 
-        foreach ($events as $event) {
-            if (! is_array($event)) {
-                continue;
+        do {
+            $data = $this->cloudflareGraphqlClient->query(RecentEmailEventsQuery::QUERY, [
+                'zoneTag' => $configuredZone->id,
+                'start' => $dateRange->start->toIso8601String(),
+                'end' => $dateRange->end->toIso8601String(),
+                'limit' => $pageSize,
+                'datetimeBefore' => $datetimeBefore,
+            ]);
+
+            $events = Arr::get($data, 'viewer.zones.0.emailSendingAdaptive', []);
+
+            if (! is_array($events) || $events === []) {
+                break;
             }
 
-            $emailEvents[] = EmailEventData::fromCloudflare($configuredZone, $this->stringKeyedArray($event));
-        }
+            $pageEvents = [];
+
+            foreach ($events as $event) {
+                if (! is_array($event)) {
+                    continue;
+                }
+
+                $pageEvents[] = EmailEventData::fromCloudflare($configuredZone, $this->stringKeyedArray($event));
+            }
+
+            $emailEvents = [...$emailEvents, ...$pageEvents];
+
+            $lastEvent = $pageEvents === [] ? null : $pageEvents[array_key_last($pageEvents)];
+            $datetimeBefore = $lastEvent?->occurredAt->toIso8601String();
+        } while ($lastEvent instanceof EmailEventData && count($events) === $pageSize);
 
         return $emailEvents;
     }

@@ -31,6 +31,6 @@ final class ListCloudflareMailEvents extends ListRecords
     {
         app(CloudflareMailEventFetcher::class)->fetch();
 
-        $this->resetTable();
+        $this->flushCachedTableRecords();
     }
 }

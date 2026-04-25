@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use DrAliRagab\FilamentCloudflareMailMonitor\Jobs\FetchCloudflareMailEvents;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
@@ -53,6 +54,73 @@ it('fetches Cloudflare events and upserts them by event hash', function (): void
         ->and($cloudflareMailEventFetcher->fetch())->toBe(1)
         ->and(CloudflareMailEvent::query()->count())->toBe(1)
         ->and(CloudflareMailEvent::query()->first()?->zone_name)->toBe('example.com');
+});
+
+it('paginates through all available email events', function (): void {
+    $requestCount = 0;
+
+    Http::fake(function (Request $request) use (&$requestCount) {
+        ++$requestCount;
+
+        $pageOne = array_map(static function (int $index): array {
+            $minute = str_pad((string) (49 - $index), 2, '0', STR_PAD_LEFT);
+
+            return [
+                'datetime' => sprintf('2026-04-25T10:%s:00Z', $minute),
+                'messageId' => 'message-'.$index,
+            ];
+        }, range(0, 49));
+
+        $pageTwo = array_map(static function (int $index): array {
+            $minute = str_pad((string) (99 - $index), 2, '0', STR_PAD_LEFT);
+
+            return [
+                'datetime' => sprintf('2026-04-25T09:%s:00Z', $minute),
+                'messageId' => 'message-'.$index,
+            ];
+        }, range(50, 99));
+
+        return match ($requestCount) {
+            1 => Http::response([
+                'data' => [
+                    'viewer' => [
+                        'zones' => [[
+                            'emailSendingAdaptive' => $pageOne,
+                        ]],
+                    ],
+                ],
+            ]),
+            2 => Http::response([
+                'data' => [
+                    'viewer' => [
+                        'zones' => [[
+                            'emailSendingAdaptive' => $pageTwo,
+                        ]],
+                    ],
+                ],
+            ]),
+            default => Http::response([
+                'data' => [
+                    'viewer' => [
+                        'zones' => [[
+                            'emailSendingAdaptive' => [],
+                        ]],
+                    ],
+                ],
+            ]),
+        };
+    });
+
+    expect(app(CloudflareMailEventFetcher::class)->fetch())->toBe(100)
+        ->and(CloudflareMailEvent::query()->count())->toBe(100);
+
+    Http::assertSentCount(3);
+
+    $requests = Http::recorded();
+
+    expect($requests[0][0]->data()['variables']['datetimeBefore'] ?? null)->toBeNull()
+        ->and($requests[1][0]->data()['variables']['datetimeBefore'] ?? null)->toBe('2026-04-25T10:00:00+00:00')
+        ->and($requests[2][0]->data()['variables']['datetimeBefore'] ?? null)->toBe('2026-04-25T09:00:00+00:00');
 });
 
 it('ignores malformed event lists without failing the whole fetch', function (): void {
