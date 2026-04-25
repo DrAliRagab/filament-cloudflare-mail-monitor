@@ -54,6 +54,7 @@ Primary layers:
 
 - `CloudflareGraphqlClient` handles authenticated Cloudflare GraphQL requests.
 - `CloudflareMailEventFetcher` fetches `emailSendingAdaptive` events and upserts them locally.
+- `CloudflareMailAggregateFetcher` fetches `emailSendingAdaptiveGroups` status counts on demand.
 - `FetchCloudflareMailEvents` runs fetches through Laravel queue infrastructure.
 - `cloudflare-mail-monitor:fetch` runs or dispatches fetches.
 - `cloudflare-mail-monitor:prune` removes records older than configured retention.
@@ -74,33 +75,29 @@ Primary layers:
 - Added dashboard page with manual refresh action.
 - Added Email Logs resource backed by local `CloudflareMailEvent` records.
 - Added stats widget for total, delivered, failed, and spam/NDR event counts.
+- Added delivery failure analytics widget for failure totals, rejected events, NDR events, and top error causes.
+- Added authentication health widget for DKIM, DMARC, SPF, and fully authenticated counts.
+- Added configured zone and occurred-at date range filters to the Email Logs resource.
+- Added aggregate query support for `emailSendingAdaptiveGroups` status counts.
 - Added privacy formatting helpers for masked email addresses and hidden subjects.
 - Added focused tests for success paths, validation failures, malformed Cloudflare data, token errors, GraphQL errors, queue dispatch, synchronous fetches, pruning, and defensive DTO normalization.
 - Added focused tests for Filament plugin registration, configurable navigation, dashboard refresh, logs table configuration, privacy formatting, summary service, and widget stats.
 - Added Laravel 13 support to Composer constraints and the CI matrix.
-- Verified the current implementation with `composer check` and 100% reported coverage.
+- Verified the current implementation with `composer check` and 99%+ reported coverage.
 
 ## Remaining Main Plan
 
-1. Add aggregate query support for `emailSendingAdaptiveGroups`.
-2. Add delivery failure analytics page/widget.
-3. Add authentication health page/widget.
-4. Add date range filtering to the Filament logs resource.
-5. Add zone filter options from configured zones.
-6. Revise README with final screenshots placeholders and troubleshooting.
-7. Run `composer check` and commit after each completed step.
+1. Add final screenshots before a tagged release.
+2. Revalidate against current Cloudflare Email Service docs before release because the product is beta.
+3. Run `composer check` and commit after each completed step.
 
 ## Missing-Part Checklist
 
-The following items are not complete yet and must be checked before a release:
+The following items must be checked before a release:
 
-- Delivery failure analytics page/widget is not implemented yet.
-- Authentication health page/widget is not implemented yet.
-- Date range filter is not implemented yet.
-- Configured zone filter options are not implemented yet.
-- `emailSendingAdaptiveGroups` aggregate query support is not implemented yet.
-- README still needs final screenshots placeholders and troubleshooting.
-- CI currently runs `composer check`, but this must be revalidated after Filament UI implementation.
+- Final README screenshots are still placeholders.
+- CI currently runs `composer check`, but this must be revalidated before tagging.
+- Cloudflare Email Service is beta, so query fields and retention should be rechecked before publishing.
 
 ## Quality Gate
 
