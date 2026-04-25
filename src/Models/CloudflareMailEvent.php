@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Models;
 
 use Carbon\CarbonImmutable;
+use DrAliRagab\FilamentCloudflareMailMonitor\Support\Config;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Prunable;
 
 /**
  * @property int $id
@@ -36,6 +38,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 final class CloudflareMailEvent extends Model
 {
+    use Prunable;
+
     protected $table = 'cloudflare_mail_monitor_events';
 
     /**
@@ -93,5 +97,14 @@ final class CloudflareMailEvent extends Model
     public function scopeBetween(Builder $builder, CarbonImmutable $start, CarbonImmutable $end): void
     {
         $builder->whereBetween('occurred_at', [$start, $end]);
+    }
+
+    /**
+     * @return Builder<self>
+     */
+    public function prunable(): Builder
+    {
+        return self::query()
+            ->where('occurred_at', '<', CarbonImmutable::now('UTC')->subDays(Config::integer('retention.days', 90)));
     }
 }

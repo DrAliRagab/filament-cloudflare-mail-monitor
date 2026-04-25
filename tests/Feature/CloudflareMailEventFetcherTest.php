@@ -7,6 +7,7 @@ use DrAliRagab\FilamentCloudflareMailMonitor\Jobs\FetchCloudflareMailEvents;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
@@ -255,20 +256,14 @@ it('prunes events older than configured retention', function (): void {
         'occurred_at' => CarbonImmutable::parse('2026-04-01T00:00:00Z'),
     ]);
 
-    $this->artisan('cloudflare-mail-monitor:prune', ['--days' => 90])
-        ->assertSuccessful();
+    Artisan::call('model:prune', ['--model' => [CloudflareMailEvent::class]]);
 
     expect(CloudflareMailEvent::query()->pluck('event_hash')->all())->toBe([str_repeat('b', 64)]);
 
     CarbonImmutable::setTestNow();
 });
 
-it('prune command rejects non-positive retention', function (): void {
-    $this->artisan('cloudflare-mail-monitor:prune', ['--days' => 0])
-        ->assertFailed();
-});
-
-it('prune command uses configured retention by default', function (): void {
+it('uses configured retention for pruning', function (): void {
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-04-25T00:00:00Z'));
     config()->set('cloudflare-mail-monitor.retention.days', 10);
 
@@ -278,8 +273,7 @@ it('prune command uses configured retention by default', function (): void {
         'occurred_at' => CarbonImmutable::parse('2026-04-01T00:00:00Z'),
     ]);
 
-    $this->artisan('cloudflare-mail-monitor:prune')
-        ->assertSuccessful();
+    Artisan::call('model:prune', ['--model' => [CloudflareMailEvent::class]]);
 
     expect(CloudflareMailEvent::query()->count())->toBe(0);
 

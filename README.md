@@ -76,10 +76,10 @@ The package ships a daily fetch command. Add it to your Laravel scheduler:
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('cloudflare-mail-monitor:fetch')->daily();
-Schedule::command('cloudflare-mail-monitor:prune')->daily();
+Schedule::command('model:prune', ['--model' => [\DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent::class]])->daily();
 ```
 
-Records older than 90 days are pruned by default. Publish the config to customize retention and every other package option.
+Laravel's prune scheduler must be registered for the table to be pruned. Records older than 90 days are pruned by default. Publish the config to customize retention and every other package option.
 
 ## Commands
 
@@ -99,12 +99,6 @@ Dispatch the fetch through your queue:
 
 ```bash
 php artisan cloudflare-mail-monitor:fetch --queue
-```
-
-Prune stored events older than the configured retention period:
-
-```bash
-php artisan cloudflare-mail-monitor:prune
 ```
 
 ## Programmatic Metrics
