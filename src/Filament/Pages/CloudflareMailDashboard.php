@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages;
 
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Config;
@@ -79,6 +80,9 @@ final class CloudflareMailDashboard extends Page
     #[\Override]
     protected function getHeaderWidgets(): array
     {
-        return [CloudflareMailStatsOverview::class];
+        return [
+            CloudflareMailStatsOverview::class,
+            CloudflareMailFailureOverview::class,
+        ];
     }
 }

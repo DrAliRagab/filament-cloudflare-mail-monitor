@@ -6,6 +6,7 @@ namespace DrAliRagab\FilamentCloudflareMailMonitor;
 
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailDashboard;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
@@ -75,7 +76,10 @@ final class CloudflareMailMonitorPlugin implements Plugin
         }
 
         if ($this->hasStatsWidget) {
-            $panel->widgets([CloudflareMailStatsOverview::class]);
+            $panel->widgets([
+                CloudflareMailStatsOverview::class,
+                CloudflareMailFailureOverview::class,
+            ]);
         }
     }
 
