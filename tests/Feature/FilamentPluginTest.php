@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
 use DrAliRagab\FilamentCloudflareMailMonitor\CloudflareMailMonitorPlugin;
+use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailDashboard;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
+use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSummary;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Privacy;
 use Filament\Panel;
@@ -215,6 +217,95 @@ it('builds dashboard widgets and stats', function (): void {
         ->and($stats)->toHaveCount(4)
         ->and($failureStats)->toHaveCount(4)
         ->and($authenticationStats)->toHaveCount(4);
+});
+
+it('shows a warning when mail monitor configuration is missing', function (): void {
+    config()->set('cloudflare-mail-monitor.api.token');
+    config()->set('cloudflare-mail-monitor.zones', []);
+
+    $cloudflareMailDashboard = app(CloudflareMailDashboard::class);
+
+    expect($cloudflareMailDashboard->hasConfiguredMailMonitor())->toBeFalse()
+        ->and($cloudflareMailDashboard->configurationWarning())->toBe('Set `CLOUDFLARE_MAIL_MONITOR_API_TOKEN` before using the dashboard.');
+});
+
+it('does not warn when configuration is present', function (): void {
+    config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.zones', [
+        ['id' => 'zone-1', 'name' => 'example.com'],
+    ]);
+
+    $cloudflareMailDashboard = app(CloudflareMailDashboard::class);
+
+    expect($cloudflareMailDashboard->hasConfiguredMailMonitor())->toBeTrue()
+        ->and($cloudflareMailDashboard->configurationWarning())->toBeNull();
+});
+
+it('warns when zones are missing', function (): void {
+    config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.zones', []);
+
+    $cloudflareMailDashboard = app(CloudflareMailDashboard::class);
+
+    expect($cloudflareMailDashboard->hasConfiguredMailMonitor())->toBeFalse()
+        ->and($cloudflareMailDashboard->configurationWarning())->toBe('Configure at least one zone in `CLOUDFLARE_MAIL_MONITOR_ZONE_ID` or the published config.');
+});
+
+it('shows a permissions warning after an authorization failure', function (): void {
+    session()->put('cloudflare-mail-monitor.last_refresh_error', [
+        'type' => CloudflareApiException::class,
+        'status_code' => 403,
+    ]);
+
+    $cloudflareMailDashboard = app(CloudflareMailDashboard::class);
+
+    expect($cloudflareMailDashboard->authorizationWarning())->toBe('The Cloudflare API token is missing the required Analytics Read permission for at least one configured zone.');
+});
+
+it('does not show a permissions warning without an authorization failure', function (): void {
+    session()->put('cloudflare-mail-monitor.last_refresh_error', [
+        'type' => 'other',
+        'status_code' => 500,
+    ]);
+
+    expect(app(CloudflareMailDashboard::class)->authorizationWarning())->toBeNull();
+});
+
+it('does not show a permissions warning for non-auth Cloudflare errors', function (): void {
+    session()->put('cloudflare-mail-monitor.last_refresh_error', [
+        'type' => CloudflareApiException::class,
+        'status_code' => 500,
+    ]);
+
+    expect(app(CloudflareMailDashboard::class)->authorizationWarning())->toBeNull();
+});
+
+it('does not show a permissions warning when no refresh error is stored', function (): void {
+    session()->forget('cloudflare-mail-monitor.last_refresh_error');
+
+    expect(app(CloudflareMailDashboard::class)->authorizationWarning())->toBeNull();
+});
+
+it('stores a permissions warning after a failed refresh', function (): void {
+    config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.zones', [
+        ['id' => 'zone-1', 'name' => 'example.com'],
+    ]);
+
+    app()->instance(CloudflareMailEventFetcher::class, new class
+    {
+        public function fetch(): int
+        {
+            throw new CloudflareApiException('Cloudflare API request failed with HTTP status 403.', 403);
+        }
+    });
+
+    app(CloudflareMailDashboard::class)->refreshCloudflareMailEvents();
+
+    expect(session('cloudflare-mail-monitor.last_refresh_error'))->toBe([
+        'type' => CloudflareApiException::class,
+        'status_code' => 403,
+    ])->and(app(CloudflareMailDashboard::class)->authorizationWarning())->toBe('The Cloudflare API token is missing the required Analytics Read permission for at least one configured zone.');
 });
 
 it('refreshes Cloudflare mail events from the dashboard action target', function (): void {

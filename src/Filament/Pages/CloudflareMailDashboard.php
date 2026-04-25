@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages;
 
+use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
@@ -20,6 +21,45 @@ final class CloudflareMailDashboard extends Page
     protected static ?string $slug = 'cloudflare-mail-monitor';
 
     protected string $view = 'filament-cloudflare-mail-monitor::pages.dashboard';
+
+    public function hasConfiguredMailMonitor(): bool
+    {
+        return Config::string('api.token') !== null
+            && Config::string('api.token') !== ''
+            && Config::zones() !== [];
+    }
+
+    public function configurationWarning(): ?string
+    {
+        if (Config::string('api.token') === null || Config::string('api.token') === '') {
+            return 'Set `CLOUDFLARE_MAIL_MONITOR_API_TOKEN` before using the dashboard.';
+        }
+
+        if (Config::zones() === []) {
+            return 'Configure at least one zone in `CLOUDFLARE_MAIL_MONITOR_ZONE_ID` or the published config.';
+        }
+
+        return null;
+    }
+
+    public function authorizationWarning(): ?string
+    {
+        $lastRefreshError = session('cloudflare-mail-monitor.last_refresh_error');
+
+        if (! is_array($lastRefreshError)) {
+            return null;
+        }
+
+        if (($lastRefreshError['type'] ?? null) !== CloudflareApiException::class) {
+            return null;
+        }
+
+        if (! in_array($lastRefreshError['status_code'] ?? null, [401, 403], true)) {
+            return null;
+        }
+
+        return 'The Cloudflare API token is missing the required Analytics Read permission for at least one configured zone.';
+    }
 
     #[\Override]
     public static function getNavigationLabel(): string
@@ -67,12 +107,27 @@ final class CloudflareMailDashboard extends Page
 
     public function refreshCloudflareMailEvents(): void
     {
-        $stored = app(CloudflareMailEventFetcher::class)->fetch();
+        try {
+            $stored = app(CloudflareMailEventFetcher::class)->fetch();
 
-        Notification::make()
-            ->title(sprintf('Stored %d Cloudflare mail event(s).', $stored))
-            ->success()
-            ->send();
+            session()->forget('cloudflare-mail-monitor.last_refresh_error');
+
+            Notification::make()
+                ->title(sprintf('Stored %d Cloudflare mail event(s).', $stored))
+                ->success()
+                ->send();
+        } catch (CloudflareApiException $cloudflareApiException) {
+            session()->put('cloudflare-mail-monitor.last_refresh_error', [
+                'type' => $cloudflareApiException::class,
+                'status_code' => $cloudflareApiException->statusCode(),
+            ]);
+
+            Notification::make()
+                ->title('Cloudflare refresh failed.')
+                ->body($this->authorizationWarning() ?? $cloudflareApiException->getMessage())
+                ->danger()
+                ->send();
+        }
     }
 
     /**
