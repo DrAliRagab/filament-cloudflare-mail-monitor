@@ -279,3 +279,19 @@ it('uses configured retention for pruning', function (): void {
 
     CarbonImmutable::setTestNow();
 });
+
+it('prunes events through the package prune command', function (): void {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-04-25T00:00:00Z'));
+
+    CloudflareMailEvent::query()->create([
+        'event_hash' => str_repeat('d', 64),
+        'zone_id' => 'zone-1',
+        'occurred_at' => CarbonImmutable::parse('2025-12-01T00:00:00Z'),
+    ]);
+
+    expect(Artisan::call('cloudflare-mail-monitor:prune'))->toBe(0);
+
+    expect(CloudflareMailEvent::query()->count())->toBe(0);
+
+    CarbonImmutable::setTestNow();
+});
