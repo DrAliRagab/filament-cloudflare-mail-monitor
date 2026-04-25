@@ -1,10 +1,17 @@
 # Cloudflare Mail Monitor for Filament
 
-Cloudflare Mail Monitor for Filament stores and visualizes outbound Cloudflare Email Service activity inside Laravel and Filament.
+Monitor outbound Cloudflare Email Service activity in Laravel and Filament.
 
-This package targets Cloudflare Email Service outbound sending only. It fetches Email Sending analytics from Cloudflare's GraphQL Analytics API, stores normalized events in your database, and exposes Filament 5 pages and widgets for monitoring delivery, failures, authentication health, and recent logs.
+This package syncs outbound Email Sending analytics from Cloudflare's GraphQL Analytics API, stores normalized events locally, and provides Filament 5 pages and widgets for delivery monitoring, failures, authentication health, and recent logs.
 
-See [`docs/implementation-plan.md`](docs/implementation-plan.md) for the revised build plan, current scope, and missing-part checklist.
+## Features
+
+- Sync outbound email events into your database
+- View searchable email logs in Filament
+- Inspect delivery failures and authentication health
+- Refresh logs manually from the dashboard, list, or detail views
+- Prune old records with Laravel `model:prune`
+- Backfill recent history on the first run, then keep syncing daily
 
 ## Requirements
 
@@ -24,16 +31,6 @@ php artisan vendor:publish --tag="cloudflare-mail-monitor-migrations"
 php artisan migrate
 ```
 
-## Configuration
-
-Set the required environment variables:
-
-```env
-CLOUDFLARE_MAIL_MONITOR_API_TOKEN=your-cloudflare-api-token
-CLOUDFLARE_MAIL_MONITOR_ZONE_ID=your-zone-id
-CLOUDFLARE_MAIL_MONITOR_ZONE_NAME=example.com
-```
-
 Register the plugin in your Filament panel provider:
 
 ```php
@@ -47,30 +44,21 @@ public function panel(Panel $panel): Panel
 }
 ```
 
-The plugin registers:
+## Configuration
 
-- A Cloudflare Mail Monitor dashboard page with a manual refresh action.
-- An Email Logs resource backed by stored Cloudflare events.
-- A stats widget for total events, delivered events, failed events, and spam/NDR signals.
-- A delivery failure analytics widget for rejected/NDR events and top failure causes.
-- An authentication health widget for DKIM, DMARC, and SPF failure counts.
+Set the required environment variables:
 
-The Email Logs resource includes filters for configured zones, delivery status, DKIM/DMARC/SPF results, spam/NDR flags, and occurred-at date ranges.
-
-You can disable plugin parts fluently if your panel only needs some screens:
-
-```php
-CloudflareMailMonitorPlugin::make()
-    ->dashboard()
-    ->logsResource()
-    ->statsWidget();
+```env
+CLOUDFLARE_MAIL_MONITOR_API_TOKEN=your-cloudflare-api-token
+CLOUDFLARE_MAIL_MONITOR_ZONE_ID=your-zone-id
+CLOUDFLARE_MAIL_MONITOR_ZONE_NAME=example.com
 ```
 
-Pass `false` to any of these methods to disable that part.
+Optional settings include retention, fetch lookback, privacy masking, and Filament navigation labels/icons.
 
 ## Scheduling
 
-The package ships a daily fetch command. Add it to your Laravel scheduler:
+Add the fetch and prune commands to your Laravel scheduler:
 
 ```php
 use Illuminate\Support\Facades\Schedule;
@@ -79,13 +67,13 @@ Schedule::command('cloudflare-mail-monitor:fetch')->daily();
 Schedule::command('cloudflare-mail-monitor:prune')->daily();
 ```
 
-After installation, run the fetch command once with a longer lookback to backfill recent history, then let the daily schedule keep syncing new events day by day:
+After installation, run a one-time backfill with a longer lookback, then let the daily schedule keep syncing new events:
 
 ```bash
 php artisan cloudflare-mail-monitor:fetch --days=30
 ```
 
-Records older than 90 days are pruned by default. Publish the config to customize retention and every other package option.
+Records older than 90 days are pruned by default. Publish the config to customize retention and other package options.
 
 ## Commands
 
@@ -107,6 +95,35 @@ Dispatch the fetch through your queue:
 php artisan cloudflare-mail-monitor:fetch --queue
 ```
 
+Prune old records immediately:
+
+```bash
+php artisan cloudflare-mail-monitor:prune
+```
+
+## What It Provides
+
+The plugin registers:
+
+- A Cloudflare Mail Monitor dashboard page with a manual refresh action
+- An Email Logs resource backed by stored Cloudflare events
+- A stats widget for total events, delivered events, failed events, and spam/NDR signals
+- A delivery failure analytics widget for rejected/NDR events and top failure causes
+- An authentication health widget for DKIM, DMARC, and SPF failure counts
+
+The Email Logs resource includes filters for configured zones, delivery status, DKIM/DMARC/SPF results, spam/NDR flags, and occurred-at date ranges.
+
+You can disable plugin parts fluently if your panel only needs some screens:
+
+```php
+CloudflareMailMonitorPlugin::make()
+    ->dashboard()
+    ->logsResource()
+    ->statsWidget();
+```
+
+Pass `false` to any of these methods to disable that part.
+
 ## Programmatic Metrics
 
 The package stores individual events locally through `CloudflareMailEventFetcher`. It also exposes `CloudflareMailAggregateFetcher` for on-demand aggregate status counts from Cloudflare's `emailSendingAdaptiveGroups` dataset.
@@ -121,19 +138,12 @@ Aggregate metrics are returned as `EmailAggregateMetricData` objects and are not
 
 ## Cloudflare Notes
 
-Cloudflare Email Service is currently evolving. This package uses the documented GraphQL Analytics datasets for outbound sending:
+Cloudflare Email Service is evolving. This package uses the documented GraphQL Analytics datasets for outbound sending:
 
 - `emailSendingAdaptiveGroups`
 - `emailSendingAdaptive`
 
 Cloudflare currently documents a 31-day analytics retention window, so scheduled fetching should run at least monthly. Daily fetching is recommended.
-
-## Screenshots
-
-Screenshots should be added before publishing the package release:
-
-- Dashboard with overview, failure analytics, and authentication health widgets.
-- Email Logs resource with zone, date range, status, and authentication filters.
 
 ## Troubleshooting
 
