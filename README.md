@@ -4,6 +4,8 @@ Cloudflare Mail Monitor for Filament stores and visualizes outbound Cloudflare E
 
 This package targets Cloudflare Email Service outbound sending only. It fetches Email Sending analytics from Cloudflare's GraphQL Analytics API, stores normalized events in your database, and exposes Filament 5 pages and widgets for monitoring delivery, failures, authentication health, and recent logs.
 
+See [`docs/implementation-plan.md`](docs/implementation-plan.md) for the revised build plan, current scope, and missing-part checklist.
+
 ## Requirements
 
 - PHP 8.3+
