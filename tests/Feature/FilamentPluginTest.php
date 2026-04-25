@@ -12,6 +12,7 @@ use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSummary;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Privacy;
 use Filament\Panel;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\BaseFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Http;
 
@@ -67,10 +68,49 @@ it('uses configurable Filament navigation values', function (): void {
 });
 
 it('configures the email logs table and pages', function (): void {
-    $table = Table::make(Mockery::mock(HasTable::class));
+    config()->set('cloudflare-mail-monitor.zones', [
+        ['id' => 'zone-1', 'name' => 'example.com'],
+        ['id' => 'zone-2'],
+    ]);
 
-    expect(CloudflareMailEventResource::table($table))->toBeInstanceOf(Table::class)
-        ->and(CloudflareMailEventResource::getPages())->toHaveKey('index');
+    $table = Table::make(Mockery::mock(HasTable::class));
+    $configuredTable = CloudflareMailEventResource::table($table);
+
+    expect($configuredTable)->toBeInstanceOf(Table::class)
+        ->and(CloudflareMailEventResource::getPages())->toHaveKey('index')
+        ->and($configuredTable->getFilters())->toHaveKeys(['zone_id', 'occurred_at'])
+        ->and(CloudflareMailEventResource::zoneFilterOptions())->toBe([
+            'zone-1' => 'example.com',
+            'zone-2' => 'zone-2',
+        ]);
+});
+
+it('filters email logs by occurred date ranges', function (): void {
+    CloudflareMailEvent::query()->create([
+        'event_hash' => str_repeat('a', 64),
+        'zone_id' => 'zone-1',
+        'occurred_at' => CarbonImmutable::parse('2026-04-20T10:00:00Z'),
+    ]);
+
+    CloudflareMailEvent::query()->create([
+        'event_hash' => str_repeat('b', 64),
+        'zone_id' => 'zone-1',
+        'occurred_at' => CarbonImmutable::parse('2026-04-25T10:00:00Z'),
+    ]);
+
+    $table = CloudflareMailEventResource::table(Table::make(Mockery::mock(HasTable::class)));
+    $dateFilter = $table->getFilter('occurred_at');
+
+    if (! $dateFilter instanceof BaseFilter) {
+        throw new RuntimeException('The occurred_at filter was not registered.');
+    }
+
+    $eventHashes = $dateFilter
+        ->apply(CloudflareMailEvent::query(), ['from' => '2026-04-21', 'until' => '2026-04-30'])
+        ->pluck('event_hash')
+        ->all();
+
+    expect($eventHashes)->toBe([str_repeat('b', 64)]);
 });
 
 it('formats private email data according to config', function (): void {

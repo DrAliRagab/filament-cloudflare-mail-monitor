@@ -8,13 +8,16 @@ use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEv
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Config;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Privacy;
+use Filament\Forms\Components\DatePicker;
 use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * @extends resource<CloudflareMailEvent>
@@ -84,7 +87,7 @@ final class CloudflareMailEventResource extends Resource
                 IconColumn::make('is_ndr')->label('NDR')->boolean()->toggleable(),
             ])
             ->filters([
-                SelectFilter::make('zone_id')->label('Zone')->attribute('zone_id'),
+                SelectFilter::make('zone_id')->label('Zone')->attribute('zone_id')->options(self::zoneFilterOptions()),
                 SelectFilter::make('status')->options([
                     'delivered' => 'Delivered',
                     'deliveryFailed' => 'Delivery failed',
@@ -95,6 +98,16 @@ final class CloudflareMailEventResource extends Resource
                 SelectFilter::make('dkim')->options(['pass' => 'Pass', 'fail' => 'Fail']),
                 SelectFilter::make('dmarc')->options(['pass' => 'Pass', 'fail' => 'Fail']),
                 SelectFilter::make('spf')->options(['pass' => 'Pass', 'fail' => 'Fail']),
+                Filter::make('occurred_at')
+                    ->schema([
+                        DatePicker::make('from')->label('From'),
+                        DatePicker::make('until')->label('Until'),
+                    ])
+                    ->query(function (mixed $query, array $data): void {
+                        if ($query instanceof Builder) {
+                            self::applyOccurredAtFilter($query, $data);
+                        }
+                    }),
                 TernaryFilter::make('is_spam'),
                 TernaryFilter::make('is_ndr')->label('NDR'),
             ])
@@ -111,5 +124,40 @@ final class CloudflareMailEventResource extends Resource
         return [
             'index' => ListCloudflareMailEvents::route('/'),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function zoneFilterOptions(): array
+    {
+        $options = [];
+
+        foreach (Config::zones() as $zone) {
+            $options[$zone['id']] = $zone['name'] ?? $zone['id'];
+        }
+
+        return $options;
+    }
+
+    /**
+     * @param  Builder<CloudflareMailEvent>  $builder
+     * @param  array<array-key, mixed>  $data
+     * @return Builder<CloudflareMailEvent>
+     */
+    public static function applyOccurredAtFilter(Builder $builder, array $data): Builder
+    {
+        $from = $data['from'] ?? null;
+        $until = $data['until'] ?? null;
+
+        if (is_string($from) && $from !== '') {
+            $builder->whereDate('occurred_at', '>=', $from);
+        }
+
+        if (is_string($until) && $until !== '') {
+            $builder->whereDate('occurred_at', '<=', $until);
+        }
+
+        return $builder;
     }
 }
