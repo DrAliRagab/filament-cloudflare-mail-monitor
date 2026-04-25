@@ -16,6 +16,6 @@ final class CloudflareMailMonitorServiceProvider extends PackageServiceProvider
         $package
             ->name(self::$name)
             ->hasConfigFile()
-            ->hasMigrations([]);
+            ->hasMigration('create_cloudflare_mail_monitor_events_table');
     }
 }
