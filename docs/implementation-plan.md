@@ -70,38 +70,35 @@ Primary layers:
 - Added `CloudflareMailEvent` Eloquent model and query scopes.
 - Added Cloudflare GraphQL client with explicit malformed response, HTTP failure, GraphQL error, and missing-token handling.
 - Added fetch service, queued job, fetch command, and prune command.
+- Added Filament 5 plugin registration.
+- Added dashboard page with manual refresh action.
+- Added Email Logs resource backed by local `CloudflareMailEvent` records.
+- Added stats widget for total, delivered, failed, and spam/NDR event counts.
+- Added privacy formatting helpers for masked email addresses and hidden subjects.
 - Added focused tests for success paths, validation failures, malformed Cloudflare data, token errors, GraphQL errors, queue dispatch, synchronous fetches, pruning, and defensive DTO normalization.
+- Added focused tests for Filament plugin registration, configurable navigation, dashboard refresh, logs table configuration, privacy formatting, summary service, and widget stats.
 - Verified the current implementation with `composer check` and 100% reported coverage.
 
 ## Remaining Main Plan
 
-1. Add Filament 5 plugin class.
-2. Add panel-scoped plugin configuration methods for navigation group, icon, sort, visibility, refresh behavior, and resource/page registration.
-3. Add dashboard page with manual refresh action.
-4. Add dashboard stats widget for total events, delivered events, failed events, and spam/NDR signals.
-5. Add email logs resource or table page backed by local `CloudflareMailEvent` records.
-6. Add filters for zone, status, event type, sending domain, date range, SPF, DKIM, DMARC, spam, and NDR.
-7. Add searchable columns for sender, recipient, subject, message ID, session ID, and error details where privacy config permits.
-8. Add delivery failure and authentication health views or widgets.
-9. Add privacy behavior for masked email addresses and hidden subjects.
-10. Add tests for Filament plugin registration, page actions, table filters, resource queries, privacy behavior, and widgets.
-11. Revise README with final installation, scheduling, permissions, Filament registration, screenshots placeholders, and troubleshooting.
-12. Run `composer check` and commit after each completed step.
+1. Add aggregate query support for `emailSendingAdaptiveGroups`.
+2. Add delivery failure analytics page/widget.
+3. Add authentication health page/widget.
+4. Add date range filtering to the Filament logs resource.
+5. Add zone filter options from configured zones.
+6. Revise README with final screenshots placeholders and troubleshooting.
+7. Run `composer check` and commit after each completed step.
 
 ## Missing-Part Checklist
 
 The following items are not complete yet and must be checked before a release:
 
-- Filament 5 plugin class is not implemented yet.
-- Dashboard page is not implemented yet.
-- Manual refresh button is not implemented yet.
-- Filament widgets are not implemented yet.
-- Email logs resource/table is not implemented yet.
 - Delivery failure analytics page/widget is not implemented yet.
 - Authentication health page/widget is not implemented yet.
-- Privacy masking is configured but not yet applied in Filament output.
+- Date range filter is not implemented yet.
+- Configured zone filter options are not implemented yet.
 - `emailSendingAdaptiveGroups` aggregate query support is not implemented yet.
-- README still needs final Filament UI usage docs after the UI exists.
+- README still needs final screenshots placeholders and troubleshooting.
 - CI currently runs `composer check`, but this must be revalidated after Filament UI implementation.
 
 ## Quality Gate

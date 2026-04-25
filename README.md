@@ -8,7 +8,7 @@ See [`docs/implementation-plan.md`](docs/implementation-plan.md) for the revised
 
 ## Requirements
 
-- PHP 8.3+
+- PHP 8.4+
 - Laravel 12+
 - Filament 5
 - Cloudflare Email Service enabled for outbound sending
@@ -46,6 +46,12 @@ public function panel(Panel $panel): Panel
         ->plugin(CloudflareMailMonitorPlugin::make());
 }
 ```
+
+The plugin registers:
+
+- A Cloudflare Mail Monitor dashboard page with a manual refresh action.
+- An Email Logs resource backed by stored Cloudflare events.
+- A stats widget for total events, delivered events, failed events, and spam/NDR signals.
 
 ## Scheduling
 
