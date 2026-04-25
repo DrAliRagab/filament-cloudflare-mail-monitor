@@ -74,6 +74,12 @@ final class CloudflareMailDashboard extends Page
     }
 
     #[\Override]
+    public static function getNavigationIcon(): ?string
+    {
+        return Config::string('filament.dashboard_navigation_icon', 'heroicon-o-chart-bar');
+    }
+
+    #[\Override]
     public static function getNavigationSort(): int
     {
         return Config::integer('filament.navigation_sort', 90);

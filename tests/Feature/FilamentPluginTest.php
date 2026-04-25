@@ -61,12 +61,14 @@ it('can disable Filament plugin parts fluently', function (): void {
 
 it('uses configurable Filament navigation values', function (): void {
     config()->set('cloudflare-mail-monitor.filament.navigation_group', 'Ops');
+    config()->set('cloudflare-mail-monitor.filament.dashboard_navigation_icon', 'heroicon-o-chart-pie');
     config()->set('cloudflare-mail-monitor.filament.navigation_icon', 'heroicon-o-chart-bar');
     config()->set('cloudflare-mail-monitor.filament.navigation_sort', 10);
     config()->set('cloudflare-mail-monitor.filament.should_register_navigation', false);
 
     expect(CloudflareMailDashboard::getNavigationLabel())->toBe('Mail Monitor')
         ->and(CloudflareMailDashboard::getNavigationGroup())->toBe('Ops')
+        ->and(CloudflareMailDashboard::getNavigationIcon())->toBe('heroicon-o-chart-pie')
         ->and(CloudflareMailDashboard::getNavigationSort())->toBe(10)
         ->and(CloudflareMailDashboard::shouldRegisterNavigation())->toBeFalse()
         ->and(CloudflareMailEventResource::getNavigationLabel())->toBe('Email Logs')
