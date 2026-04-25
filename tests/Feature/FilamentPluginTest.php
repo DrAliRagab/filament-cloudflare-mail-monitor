@@ -140,6 +140,16 @@ it('builds the email log infolist', function (): void {
     expect($components)->not->toBeEmpty()
         ->and($rawEntry)->not->toBeNull()
         ->and($rawEntry->formatState(['foo' => 'bar']))->toBe("{\n    \"foo\": \"bar\"\n}")
+        ->and($rawEntry->formatState('{"foo":"bar"}'))->toBe("{\n    \"foo\": \"bar\"\n}")
+        ->and($rawEntry->formatState(7))->toBe('7')
+        ->and($rawEntry->formatState(new class implements Stringable
+        {
+            public function __toString(): string
+            {
+                return 'stringable-value';
+            }
+        }))->toBe('stringable-value')
+        ->and($rawEntry->formatState(new stdClass))->toBeNull()
         ->and($rawEntry->formatState(null))->toBeNull();
 });
 

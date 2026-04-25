@@ -157,8 +157,28 @@ final class CloudflareMailEventResource extends Resource
             TextEntry::make('is_ndr')->label('NDR')->badge(),
             TextEntry::make('raw')
                 ->label('Raw payload')
-                ->formatStateUsing(static function (?array $state): ?string {
+                ->formatStateUsing(static function (mixed $state): ?string {
                     if ($state === null) {
+                        return null;
+                    }
+
+                    if (is_string($state)) {
+                        $decoded = json_decode($state, true);
+
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $state = $decoded;
+                        }
+                    }
+
+                    if (! is_array($state)) {
+                        if (is_scalar($state)) {
+                            return var_export($state, true);
+                        }
+
+                        if ($state instanceof \Stringable) {
+                            return (string) $state;
+                        }
+
                         return null;
                     }
 
