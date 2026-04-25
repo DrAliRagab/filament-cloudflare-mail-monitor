@@ -9,7 +9,7 @@ See [`docs/implementation-plan.md`](docs/implementation-plan.md) for the revised
 ## Requirements
 
 - PHP 8.4+
-- Laravel 12+
+- Laravel 12 or 13
 - Filament 5
 - Cloudflare Email Service enabled for outbound sending
 - Cloudflare API token with `Analytics Read` access for the configured zones

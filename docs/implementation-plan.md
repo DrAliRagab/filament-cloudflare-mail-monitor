@@ -4,7 +4,7 @@ This document revises the original package prompt into the current build plan an
 
 ## Revised Goal
 
-Build `draliragab/filament-cloudflare-mail-monitor`, a Laravel 12 and Filament 5 package that monitors outbound Cloudflare Email Service sending activity.
+Build `draliragab/filament-cloudflare-mail-monitor`, a Laravel 12/13 and Filament 5 package that monitors outbound Cloudflare Email Service sending activity.
 
 The package must:
 
@@ -77,6 +77,7 @@ Primary layers:
 - Added privacy formatting helpers for masked email addresses and hidden subjects.
 - Added focused tests for success paths, validation failures, malformed Cloudflare data, token errors, GraphQL errors, queue dispatch, synchronous fetches, pruning, and defensive DTO normalization.
 - Added focused tests for Filament plugin registration, configurable navigation, dashboard refresh, logs table configuration, privacy formatting, summary service, and widget stats.
+- Added Laravel 13 support to Composer constraints and the CI matrix.
 - Verified the current implementation with `composer check` and 100% reported coverage.
 
 ## Remaining Main Plan
