@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use DrAliRagab\FilamentCloudflareMailMonitor\CloudflareMailMonitorPlugin;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailDashboard;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
@@ -29,7 +30,8 @@ it('registers Filament pages resources and widgets by default', function (): voi
     expect($panel->getPages())->toContain(CloudflareMailDashboard::class)
         ->and($panel->getResources())->toContain(CloudflareMailEventResource::class)
         ->and($panel->getWidgets())->toContain(CloudflareMailStatsOverview::class)
-        ->and($panel->getWidgets())->toContain(CloudflareMailFailureOverview::class);
+        ->and($panel->getWidgets())->toContain(CloudflareMailFailureOverview::class)
+        ->and($panel->getWidgets())->toContain(CloudflareMailAuthenticationOverview::class);
 });
 
 it('can disable Filament plugin parts fluently', function (): void {
@@ -48,7 +50,8 @@ it('can disable Filament plugin parts fluently', function (): void {
         ->and($panel->getPages())->not->toContain(CloudflareMailDashboard::class)
         ->and($panel->getResources())->not->toContain(CloudflareMailEventResource::class)
         ->and($panel->getWidgets())->not->toContain(CloudflareMailStatsOverview::class)
-        ->and($panel->getWidgets())->not->toContain(CloudflareMailFailureOverview::class);
+        ->and($panel->getWidgets())->not->toContain(CloudflareMailFailureOverview::class)
+        ->and($panel->getWidgets())->not->toContain(CloudflareMailAuthenticationOverview::class);
 });
 
 it('uses configurable Filament navigation values', function (): void {
@@ -133,6 +136,9 @@ it('summarizes stored mail events for widgets', function (): void {
         'zone_id' => 'zone-1',
         'occurred_at' => CarbonImmutable::parse('2026-04-25T10:00:00Z'),
         'status' => 'delivered',
+        'dkim' => 'pass',
+        'dmarc' => 'pass',
+        'spf' => 'pass',
     ]);
 
     CloudflareMailEvent::query()->create([
@@ -141,6 +147,9 @@ it('summarizes stored mail events for widgets', function (): void {
         'occurred_at' => CarbonImmutable::parse('2026-04-25T10:01:00Z'),
         'status' => 'deliveryFailed',
         'is_ndr' => true,
+        'dkim' => 'fail',
+        'dmarc' => 'pass',
+        'spf' => 'fail',
     ]);
 
     CloudflareMailEvent::query()->create([
@@ -149,6 +158,9 @@ it('summarizes stored mail events for widgets', function (): void {
         'occurred_at' => CarbonImmutable::parse('2026-04-25T10:02:00Z'),
         'status' => 'rejected',
         'error_cause' => 'policy',
+        'dkim' => 'pass',
+        'dmarc' => 'fail',
+        'spf' => 'pass',
     ]);
 
     CloudflareMailEvent::query()->create([
@@ -157,6 +169,9 @@ it('summarizes stored mail events for widgets', function (): void {
         'occurred_at' => CarbonImmutable::parse('2026-04-25T10:03:00Z'),
         'status' => 'failed',
         'error_cause' => 'policy',
+        'dkim' => 'fail',
+        'dmarc' => 'fail',
+        'spf' => 'fail',
     ]);
 
     expect(app(CloudflareMailSummary::class)->totals())->toBe([
@@ -170,6 +185,11 @@ it('summarizes stored mail events for widgets', function (): void {
         'ndr' => 1,
         'top_error_cause' => 'policy',
         'top_error_cause_count' => 2,
+    ])->and(app(CloudflareMailSummary::class)->authenticationHealth())->toBe([
+        'dkim_fail' => 2,
+        'dmarc_fail' => 2,
+        'spf_fail' => 2,
+        'all_pass' => 1,
     ]);
 });
 
@@ -177,17 +197,24 @@ it('builds dashboard widgets and stats', function (): void {
     $cloudflareMailDashboard = app(CloudflareMailDashboard::class);
     $cloudflareMailStatsOverview = app(CloudflareMailStatsOverview::class);
     $cloudflareMailFailureOverview = app(CloudflareMailFailureOverview::class);
+    $cloudflareMailAuthenticationOverview = app(CloudflareMailAuthenticationOverview::class);
 
     $actions = Closure::bind(static fn (): array => $cloudflareMailDashboard->getHeaderActions(), null, CloudflareMailDashboard::class)();
     $widgets = Closure::bind(static fn (): array => $cloudflareMailDashboard->getHeaderWidgets(), null, CloudflareMailDashboard::class)();
     $stats = Closure::bind(static fn (): array => $cloudflareMailStatsOverview->getStats(), null, CloudflareMailStatsOverview::class)();
     $failureStats = Closure::bind(static fn (): array => $cloudflareMailFailureOverview->getStats(), null, CloudflareMailFailureOverview::class)();
+    $authenticationStats = Closure::bind(static fn (): array => $cloudflareMailAuthenticationOverview->getStats(), null, CloudflareMailAuthenticationOverview::class)();
 
     expect($cloudflareMailDashboard->getTitle())->toBe('Cloudflare Mail Monitor')
         ->and($actions)->toHaveCount(1)
-        ->and($widgets)->toBe([CloudflareMailStatsOverview::class, CloudflareMailFailureOverview::class])
+        ->and($widgets)->toBe([
+            CloudflareMailStatsOverview::class,
+            CloudflareMailFailureOverview::class,
+            CloudflareMailAuthenticationOverview::class,
+        ])
         ->and($stats)->toHaveCount(4)
-        ->and($failureStats)->toHaveCount(4);
+        ->and($failureStats)->toHaveCount(4)
+        ->and($authenticationStats)->toHaveCount(4);
 });
 
 it('refreshes Cloudflare mail events from the dashboard action target', function (): void {

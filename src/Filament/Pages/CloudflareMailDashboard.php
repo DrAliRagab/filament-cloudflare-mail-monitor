@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages;
 
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
@@ -83,6 +84,7 @@ final class CloudflareMailDashboard extends Page
         return [
             CloudflareMailStatsOverview::class,
             CloudflareMailFailureOverview::class,
+            CloudflareMailAuthenticationOverview::class,
         ];
     }
 }

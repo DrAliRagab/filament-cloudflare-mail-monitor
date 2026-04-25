@@ -56,4 +56,21 @@ final class CloudflareMailSummary
             'top_error_cause_count' => is_int($topErrorCauseCount) ? $topErrorCauseCount : 0,
         ];
     }
+
+    /**
+     * @return array{dkim_fail: int, dmarc_fail: int, spf_fail: int, all_pass: int}
+     */
+    public function authenticationHealth(): array
+    {
+        return [
+            'dkim_fail' => CloudflareMailEvent::query()->where('dkim', 'fail')->count(),
+            'dmarc_fail' => CloudflareMailEvent::query()->where('dmarc', 'fail')->count(),
+            'spf_fail' => CloudflareMailEvent::query()->where('spf', 'fail')->count(),
+            'all_pass' => CloudflareMailEvent::query()
+                ->where('dkim', 'pass')
+                ->where('dmarc', 'pass')
+                ->where('spf', 'pass')
+                ->count(),
+        ];
+    }
 }
