@@ -79,14 +79,14 @@ final class CloudflareMailEventResource extends Resource
             ->recordUrl(static fn (Model $model): string => self::getUrl('view', ['record' => $model]))
             ->columns([
                 TextColumn::make('occurred_at')->dateTime()->sortable(),
-                TextColumn::make('zone_name')->label('Zone')->searchable()->toggleable(),
+                TextColumn::make('zone_name')->label('Zone')->searchable()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('status')->badge()->searchable()->sortable(),
-                TextColumn::make('event_type')->label('Event')->badge()->toggleable(),
+                TextColumn::make('event_type')->label('Event')->badge()->toggleable()->searchable()->sortable(),
                 TextColumn::make('from')->formatStateUsing(static fn (?string $state): ?string => Privacy::email($state))->searchable(),
                 TextColumn::make('to')->formatStateUsing(static fn (?string $state): ?string => Privacy::email($state))->searchable(),
                 TextColumn::make('subject')->formatStateUsing(static fn (?string $state): ?string => Privacy::subject($state))->searchable()->limit(50),
                 TextColumn::make('message_id')->searchable()->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('sending_domain')->searchable()->toggleable(),
+                TextColumn::make('sending_domain')->searchable()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('error_cause')->badge()->searchable()->toggleable(),
                 IconColumn::make('is_spam')->boolean()->toggleable(),
                 IconColumn::make('is_ndr')->label('NDR')->boolean()->toggleable(),
