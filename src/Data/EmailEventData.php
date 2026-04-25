@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Data;
 
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
+use Stringable;
 
 final readonly class EmailEventData
 {
     /**
-     * @param array<string, mixed> $raw
+     * @param  array<string, mixed>  $raw
      */
     public function __construct(
         public ConfiguredZone $zone,
@@ -34,13 +36,13 @@ final readonly class EmailEventData
     ) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
-    public static function fromCloudflare(ConfiguredZone $zone, array $payload): self
+    public static function fromCloudflare(ConfiguredZone $configuredZone, array $payload): self
     {
         return new self(
-            zone: $zone,
-            occurredAt: CarbonImmutable::parse((string) ($payload['datetime'] ?? 'now'), 'UTC')->utc(),
+            zone: $configuredZone,
+            occurredAt: self::dateTime($payload['datetime'] ?? null),
             messageId: self::nullableString($payload['messageId'] ?? null),
             sessionId: self::nullableString($payload['sessionId'] ?? null),
             from: self::nullableString($payload['from'] ?? null),
@@ -111,6 +113,23 @@ final readonly class EmailEventData
             return null;
         }
 
-        return is_string($value) ? $value : (string) $value;
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_scalar($value) || $value instanceof Stringable) {
+            return (string) $value;
+        }
+
+        return null;
+    }
+
+    private static function dateTime(mixed $value): CarbonImmutable
+    {
+        if ($value instanceof DateTimeInterface || is_string($value) || is_int($value) || is_float($value)) {
+            return CarbonImmutable::parse($value, 'UTC')->utc();
+        }
+
+        return CarbonImmutable::now('UTC');
     }
 }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace DrAliRagab\FilamentCloudflareMailMonitor;
 
+use DrAliRagab\FilamentCloudflareMailMonitor\Cloudflare\CloudflareGraphqlClient;
+use DrAliRagab\FilamentCloudflareMailMonitor\Commands\FetchCloudflareMailEventsCommand;
+use DrAliRagab\FilamentCloudflareMailMonitor\Commands\PruneCloudflareMailEventsCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -16,6 +19,15 @@ final class CloudflareMailMonitorServiceProvider extends PackageServiceProvider
         $package
             ->name(self::$name)
             ->hasConfigFile()
-            ->hasMigration('create_cloudflare_mail_monitor_events_table');
+            ->hasMigration('create_cloudflare_mail_monitor_events_table')
+            ->hasCommands([
+                FetchCloudflareMailEventsCommand::class,
+                PruneCloudflareMailEventsCommand::class,
+            ]);
+    }
+
+    public function packageRegistered(): void
+    {
+        $this->app->singleton(CloudflareGraphqlClient::class);
     }
 }

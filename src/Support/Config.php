@@ -5,32 +5,49 @@ declare(strict_types=1);
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Support;
 
 use Illuminate\Support\Arr;
+use Stringable;
 
 final class Config
 {
     public static function string(string $key, ?string $default = null): ?string
     {
-        $value = config("cloudflare-mail-monitor.{$key}", $default);
+        $value = config('cloudflare-mail-monitor.'.$key, $default);
 
         if ($value === null) {
             return null;
         }
 
-        return is_string($value) ? $value : (string) $value;
+        if (is_scalar($value) || $value instanceof Stringable) {
+            return (string) $value;
+        }
+
+        return $default;
     }
 
     public static function integer(string $key, int $default): int
     {
-        return (int) config("cloudflare-mail-monitor.{$key}", $default);
+        $value = config('cloudflare-mail-monitor.'.$key, $default);
+
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return $default;
     }
 
     public static function boolean(string $key, bool $default = false): bool
     {
-        return (bool) config("cloudflare-mail-monitor.{$key}", $default);
+        $value = config('cloudflare-mail-monitor.'.$key, $default);
+
+        return is_bool($value) ? $value : $default;
     }
 
     /**
-     * @return array<int, array{id: string|null, name?: string|null}>
+     * @return list<array{id: string, name?: string|null}>
      */
     public static function zones(): array
     {
@@ -40,8 +57,29 @@ final class Config
             return [];
         }
 
-        return array_values(array_filter($zones, static function (mixed $zone): bool {
-            return is_array($zone) && is_string(Arr::get($zone, 'id')) && Arr::get($zone, 'id') !== '';
-        }));
+        $configuredZones = [];
+
+        foreach ($zones as $zone) {
+            if (! is_array($zone)) {
+                continue;
+            }
+
+            $id = Arr::get($zone, 'id');
+            if (! is_string($id)) {
+                continue;
+            }
+
+            if ($id === '') {
+                continue;
+            }
+
+            $name = Arr::get($zone, 'name');
+            $configuredZones[] = [
+                'id' => $id,
+                'name' => is_string($name) && $name !== '' ? $name : null,
+            ];
+        }
+
+        return $configuredZones;
     }
 }

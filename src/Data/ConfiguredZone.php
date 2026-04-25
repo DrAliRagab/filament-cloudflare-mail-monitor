@@ -18,7 +18,7 @@ final readonly class ConfiguredZone
     }
 
     /**
-     * @param array{id?: string|null, name?: string|null} $data
+     * @param  array{id?: string|null, name?: string|null}  $data
      */
     public static function fromArray(array $data): self
     {
@@ -30,7 +30,7 @@ final readonly class ConfiguredZone
 
         return new self(
             id: $id,
-            name: isset($data['name']) && $data['name'] !== '' ? (string) $data['name'] : null,
+            name: isset($data['name']) && $data['name'] !== '' ? $data['name'] : null,
         );
     }
 }

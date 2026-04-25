@@ -25,7 +25,7 @@ final readonly class DateRange
         }
 
         if ($days > $maxDays) {
-            throw new InvalidArgumentException("Lookback days cannot exceed {$maxDays} days.");
+            throw new InvalidArgumentException(sprintf('Lookback days cannot exceed %d days.', $maxDays));
         }
 
         $end = ($now ?? CarbonImmutable::now('UTC'))->utc();

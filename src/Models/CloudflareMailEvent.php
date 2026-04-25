@@ -68,6 +68,7 @@ final class CloudflareMailEvent extends Model
     /**
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -79,22 +80,18 @@ final class CloudflareMailEvent extends Model
     }
 
     /**
-     * @param Builder<self> $query
-     *
-     * @return Builder<self>
+     * @param  Builder<self>  $builder
      */
-    public function scopeForZone(Builder $query, string $zoneId): Builder
+    public function scopeForZone(Builder $builder, string $zoneId): void
     {
-        return $query->where('zone_id', $zoneId);
+        $builder->where('zone_id', $zoneId);
     }
 
     /**
-     * @param Builder<self> $query
-     *
-     * @return Builder<self>
+     * @param  Builder<self>  $builder
      */
-    public function scopeBetween(Builder $query, CarbonImmutable $start, CarbonImmutable $end): Builder
+    public function scopeBetween(Builder $builder, CarbonImmutable $start, CarbonImmutable $end): void
     {
-        return $query->whereBetween('occurred_at', [$start, $end]);
+        $builder->whereBetween('occurred_at', [$start, $end]);
     }
 }

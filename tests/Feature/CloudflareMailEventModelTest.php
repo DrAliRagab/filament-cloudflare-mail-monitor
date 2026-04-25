@@ -8,12 +8,12 @@ use DrAliRagab\FilamentCloudflareMailMonitor\Data\EmailEventData;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
 
 beforeEach(function (): void {
-    $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
+    $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
 });
 
 it('persists normalized Cloudflare email event data', function (): void {
-    $event = EmailEventData::fromCloudflare(
-        zone: new ConfiguredZone('zone-1', 'example.com'),
+    $emailEventData = EmailEventData::fromCloudflare(
+        configuredZone: new ConfiguredZone('zone-1', 'example.com'),
         payload: [
             'datetime' => '2026-04-25T10:15:00Z',
             'messageId' => 'message-1',
@@ -32,12 +32,12 @@ it('persists normalized Cloudflare email event data', function (): void {
         ],
     );
 
-    $record = CloudflareMailEvent::query()->create($event->toDatabaseAttributes());
+    $cloudflareMailEvent = CloudflareMailEvent::query()->create($emailEventData->toDatabaseAttributes());
 
-    expect($record->event_hash)->toHaveLength(64)
-        ->and($record->occurred_at)->toBeInstanceOf(CarbonImmutable::class)
-        ->and($record->is_spam)->toBeFalse()
-        ->and($record->raw)->toHaveKey('messageId', 'message-1');
+    expect($cloudflareMailEvent->event_hash)->toHaveLength(64)
+        ->and($cloudflareMailEvent->occurred_at)->toBeInstanceOf(CarbonImmutable::class)
+        ->and($cloudflareMailEvent->is_spam)->toBeFalse()
+        ->and($cloudflareMailEvent->raw)->toHaveKey('messageId', 'message-1');
 });
 
 it('can scope events by zone and date range', function (): void {

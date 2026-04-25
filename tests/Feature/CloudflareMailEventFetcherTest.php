@@ -1,0 +1,219 @@
+<?php
+
+declare(strict_types=1);
+
+use Carbon\CarbonImmutable;
+use DrAliRagab\FilamentCloudflareMailMonitor\Jobs\FetchCloudflareMailEvents;
+use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
+use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+
+beforeEach(function (): void {
+    $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+
+    config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.fetch.page_size', 50);
+    config()->set('cloudflare-mail-monitor.zones', [
+        ['id' => 'zone-1', 'name' => 'example.com'],
+    ]);
+});
+
+it('fetches Cloudflare events and upserts them by event hash', function (): void {
+    Http::fake([
+        'api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => [
+                'viewer' => [
+                    'zones' => [[
+                        'emailSendingAdaptive' => [[
+                            'datetime' => '2026-04-25T10:15:00Z',
+                            'messageId' => 'message-1',
+                            'sessionId' => 'session-1',
+                            'from' => 'sender@example.com',
+                            'to' => 'user@example.net',
+                            'subject' => 'Welcome',
+                            'status' => 'delivered',
+                            'eventType' => 'delivery',
+                            'sendingDomain' => 'example.com',
+                            'dkim' => 'pass',
+                            'dmarc' => 'pass',
+                            'spf' => 'pass',
+                            'isSpam' => 0,
+                            'isNDR' => 0,
+                        ]],
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    $cloudflareMailEventFetcher = app(CloudflareMailEventFetcher::class);
+
+    expect($cloudflareMailEventFetcher->fetch())->toBe(1)
+        ->and($cloudflareMailEventFetcher->fetch())->toBe(1)
+        ->and(CloudflareMailEvent::query()->count())->toBe(1)
+        ->and(CloudflareMailEvent::query()->first()?->zone_name)->toBe('example.com');
+});
+
+it('ignores malformed event lists without failing the whole fetch', function (): void {
+    Http::fake([
+        'api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => [
+                'viewer' => [
+                    'zones' => [[
+                        'emailSendingAdaptive' => 'not-a-list',
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    expect(app(CloudflareMailEventFetcher::class)->fetch())->toBe(0)
+        ->and(CloudflareMailEvent::query()->count())->toBe(0);
+});
+
+it('skips malformed items inside Cloudflare event lists', function (): void {
+    Http::fake([
+        'api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => [
+                'viewer' => [
+                    'zones' => [[
+                        'emailSendingAdaptive' => [
+                            'not-an-event',
+                            ['datetime' => '2026-04-25T10:15:00Z', 'messageId' => 'valid-event'],
+                        ],
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    expect(app(CloudflareMailEventFetcher::class)->fetch())->toBe(1)
+        ->and(CloudflareMailEvent::query()->where('message_id', 'valid-event')->exists())->toBeTrue();
+});
+
+it('fetch command rejects invalid lookback days', function (): void {
+    $this->artisan('cloudflare-mail-monitor:fetch', ['--days' => 0])
+        ->assertFailed();
+});
+
+it('fetch command can dispatch a queued fetch job', function (): void {
+    Queue::fake();
+
+    $this->artisan('cloudflare-mail-monitor:fetch', ['--days' => 2, '--queue' => true])
+        ->assertSuccessful();
+
+    Queue::assertPushed(FetchCloudflareMailEvents::class, fn (FetchCloudflareMailEvents $fetchCloudflareMailEvents): bool => $fetchCloudflareMailEvents->lookbackDays === 2);
+});
+
+it('fetch command stores events synchronously', function (): void {
+    Http::fake([
+        'api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => [
+                'viewer' => [
+                    'zones' => [[
+                        'emailSendingAdaptive' => [[
+                            'datetime' => '2026-04-25T10:15:00Z',
+                            'messageId' => 'message-command',
+                        ]],
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    $this->artisan('cloudflare-mail-monitor:fetch')
+        ->assertSuccessful();
+
+    expect(CloudflareMailEvent::query()->where('message_id', 'message-command')->exists())->toBeTrue();
+});
+
+it('fetch job stores events with a requested lookback range', function (): void {
+    Http::fake([
+        'api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => [
+                'viewer' => [
+                    'zones' => [[
+                        'emailSendingAdaptive' => [[
+                            'datetime' => '2026-04-25T10:15:00Z',
+                            'messageId' => 'message-job',
+                        ]],
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    app(FetchCloudflareMailEvents::class, ['lookbackDays' => 2])
+        ->handle(app(CloudflareMailEventFetcher::class));
+
+    expect(CloudflareMailEvent::query()->where('message_id', 'message-job')->exists())->toBeTrue();
+});
+
+it('fetch job stores events with the default configured range', function (): void {
+    Http::fake([
+        'api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => [
+                'viewer' => [
+                    'zones' => [[
+                        'emailSendingAdaptive' => [[
+                            'datetime' => '2026-04-25T10:15:00Z',
+                            'messageId' => 'message-job-default',
+                        ]],
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    app(FetchCloudflareMailEvents::class)
+        ->handle(app(CloudflareMailEventFetcher::class));
+
+    expect(CloudflareMailEvent::query()->where('message_id', 'message-job-default')->exists())->toBeTrue();
+});
+
+it('prunes events older than configured retention', function (): void {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-04-25T00:00:00Z'));
+
+    CloudflareMailEvent::query()->create([
+        'event_hash' => str_repeat('a', 64),
+        'zone_id' => 'zone-1',
+        'occurred_at' => CarbonImmutable::parse('2025-12-01T00:00:00Z'),
+    ]);
+
+    CloudflareMailEvent::query()->create([
+        'event_hash' => str_repeat('b', 64),
+        'zone_id' => 'zone-1',
+        'occurred_at' => CarbonImmutable::parse('2026-04-01T00:00:00Z'),
+    ]);
+
+    $this->artisan('cloudflare-mail-monitor:prune', ['--days' => 90])
+        ->assertSuccessful();
+
+    expect(CloudflareMailEvent::query()->pluck('event_hash')->all())->toBe([str_repeat('b', 64)]);
+
+    CarbonImmutable::setTestNow();
+});
+
+it('prune command rejects non-positive retention', function (): void {
+    $this->artisan('cloudflare-mail-monitor:prune', ['--days' => 0])
+        ->assertFailed();
+});
+
+it('prune command uses configured retention by default', function (): void {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-04-25T00:00:00Z'));
+    config()->set('cloudflare-mail-monitor.retention.days', 10);
+
+    CloudflareMailEvent::query()->create([
+        'event_hash' => str_repeat('c', 64),
+        'zone_id' => 'zone-1',
+        'occurred_at' => CarbonImmutable::parse('2026-04-01T00:00:00Z'),
+    ]);
+
+    $this->artisan('cloudflare-mail-monitor:prune')
+        ->assertSuccessful();
+
+    expect(CloudflareMailEvent::query()->count())->toBe(0);
+
+    CarbonImmutable::setTestNow();
+});

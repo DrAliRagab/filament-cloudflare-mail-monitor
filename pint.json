@@ -2,6 +2,9 @@
     "preset": "laravel",
     "rules": {
         "declare_strict_types": true,
+        "increment_style": {
+            "style": "pre"
+        },
         "ordered_imports": {
             "sort_algorithm": "alpha"
         }
