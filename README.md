@@ -79,6 +79,12 @@ Schedule::command('cloudflare-mail-monitor:fetch')->daily();
 Schedule::command('cloudflare-mail-monitor:prune')->daily();
 ```
 
+After installation, run the fetch command once with a longer lookback to backfill recent history, then let the daily schedule keep syncing new events day by day:
+
+```bash
+php artisan cloudflare-mail-monitor:fetch --days=30
+```
+
 Records older than 90 days are pruned by default. Publish the config to customize retention and every other package option.
 
 ## Commands
