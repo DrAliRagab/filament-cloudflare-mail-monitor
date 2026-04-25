@@ -1,0 +1,75 @@
+{
+    "name": "draliragab/filament-cloudflare-mail-monitor",
+    "description": "Cloudflare Email Service outbound metrics and logs monitor for Filament.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "cloudflare",
+        "email-service",
+        "filament",
+        "laravel",
+        "mail",
+        "monitoring"
+    ],
+    "homepage": "https://github.com/DrAliRagab/filament-cloudflare-mail-monitor",
+    "support": {
+        "issues": "https://github.com/DrAliRagab/filament-cloudflare-mail-monitor/issues",
+        "source": "https://github.com/DrAliRagab/filament-cloudflare-mail-monitor"
+    },
+    "authors": [
+        {
+            "name": "Dr Ali Ragab",
+            "homepage": "https://github.com/DrAliRagab"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "filament/filament": "^5.0",
+        "illuminate/console": "^12.0",
+        "illuminate/contracts": "^12.0",
+        "illuminate/database": "^12.0",
+        "illuminate/http": "^12.0",
+        "illuminate/support": "^12.0",
+        "livewire/livewire": "^4.0",
+        "spatie/laravel-package-tools": "^1.92"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.25",
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^10.0",
+        "pestphp/pest": "^3.8|^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "DrAliRagab\\FilamentCloudflareMailMonitor\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DrAliRagab\\FilamentCloudflareMailMonitor\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "analyse": "vendor/bin/phpstan analyse",
+        "format": "vendor/bin/pint",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage --min=85"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "DrAliRagab\\FilamentCloudflareMailMonitor\\CloudflareMailMonitorServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

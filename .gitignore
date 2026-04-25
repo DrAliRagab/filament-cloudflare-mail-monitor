@@ -1,0 +1,15 @@
+/vendor/
+/composer.lock
+/.phpunit.cache/
+/.phpunit.result.cache
+/coverage/
+/.idea/
+/.vscode/
+.DS_Store
+.env
+.env.*
+!.env.example
+/.agents/
+/.claude/
+/.codex
+/skills-lock.json
