@@ -23,8 +23,8 @@ return new class extends Migration
             $table->json('raw')->nullable();
             $table->timestamps();
 
-            $table->unique(['zone_id', 'suppression_id']);
-            $table->index(['zone_id', 'reason', 'suppressed_at']);
+            $table->unique(['zone_id', 'suppression_id'], 'cf_mail_suppressions_zone_suppression_unique');
+            $table->index(['zone_id', 'reason', 'suppressed_at'], 'cf_mail_suppressions_zone_reason_date_index');
         });
     }
 
