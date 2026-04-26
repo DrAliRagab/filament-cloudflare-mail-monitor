@@ -24,6 +24,10 @@ return [
         'page_size' => (int) env('CLOUDFLARE_MAIL_MONITOR_FETCH_PAGE_SIZE', 500),
     ],
 
+    'suppressions' => [
+        'page_size' => (int) env('CLOUDFLARE_MAIL_MONITOR_SUPPRESSIONS_PAGE_SIZE', 100),
+    ],
+
     'retention' => [
         'days' => (int) env('CLOUDFLARE_MAIL_MONITOR_RETENTION_DAYS', 90),
     ],
@@ -37,6 +41,7 @@ return [
         'navigation_group' => env('CLOUDFLARE_MAIL_MONITOR_NAVIGATION_GROUP', 'Cloudflare'),
         'dashboard_navigation_icon' => env('CLOUDFLARE_MAIL_MONITOR_DASHBOARD_NAVIGATION_ICON', 'heroicon-o-chart-bar'),
         'navigation_icon' => env('CLOUDFLARE_MAIL_MONITOR_NAVIGATION_ICON', 'heroicon-o-envelope'),
+        'suppressions_navigation_icon' => env('CLOUDFLARE_MAIL_MONITOR_SUPPRESSIONS_NAVIGATION_ICON', 'heroicon-o-no-symbol'),
         'navigation_sort' => (int) env('CLOUDFLARE_MAIL_MONITOR_NAVIGATION_SORT', 90),
         'should_register_navigation' => (bool) env('CLOUDFLARE_MAIL_MONITOR_REGISTER_NAVIGATION', true),
     ],

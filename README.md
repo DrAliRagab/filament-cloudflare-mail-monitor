@@ -8,6 +8,7 @@ This package syncs outbound Email Sending analytics from Cloudflare's GraphQL An
 
 - Sync outbound email events into your database
 - View searchable email logs in Filament
+- View zone-scoped Email Sending suppressions in Filament
 - Inspect delivery failures and authentication health
 - Refresh logs manually from the dashboard, list, or detail views
 - Prune old records with Laravel `model:prune`
@@ -19,7 +20,7 @@ This package syncs outbound Email Sending analytics from Cloudflare's GraphQL An
 - Laravel 12 or 13
 - Filament 5
 - Cloudflare Email Service enabled for outbound sending
-- Cloudflare API token with `Analytics Read` access for the configured zones
+- Cloudflare API token with `Analytics Read` and Email Sending suppression read access for the configured zones
 
 ## Installation
 
@@ -55,6 +56,7 @@ CLOUDFLARE_MAIL_MONITOR_ZONE_NAME=example.com
 ```
 
 Optional settings include retention, fetch lookback, privacy masking, and Filament navigation labels/icons.
+Use `CLOUDFLARE_MAIL_MONITOR_SUPPRESSIONS_PAGE_SIZE` to tune suppression API pagination, up to Cloudflare's documented maximum of 1000.
 
 ## Scheduling
 
@@ -106,6 +108,7 @@ php artisan cloudflare-mail-monitor:prune
 The plugin registers:
 
 - A Cloudflare Mail Monitor dashboard page with a manual refresh action
+- A Suppressions page loaded from each configured zone's Email Sending suppression API
 - An Email Logs resource backed by stored Cloudflare events
 - A stats widget for total events, delivered events, failed events, and spam/NDR signals
 - A delivery failure analytics widget for rejected/NDR events and top failure causes
@@ -118,6 +121,7 @@ You can disable plugin parts fluently if your panel only needs some screens:
 ```php
 CloudflareMailMonitorPlugin::make()
     ->dashboard()
+    ->suppressionsPage()
     ->logsResource()
     ->statsWidget();
 ```
@@ -143,12 +147,15 @@ Cloudflare Email Service is evolving. This package uses the documented GraphQL A
 - `emailSendingAdaptiveGroups`
 - `emailSendingAdaptive`
 
+The Suppressions page uses the zone-scoped REST endpoint `GET /zones/{zone_id}/email/sending/suppression` for each configured zone. It does not require a Cloudflare account ID.
+
 Cloudflare currently documents a 31-day analytics retention window, so scheduled fetching should run at least monthly. Daily fetching is recommended.
 
 ## Troubleshooting
 
 - `Cloudflare API token is not configured`: set `CLOUDFLARE_MAIL_MONITOR_API_TOKEN` and clear cached config with `php artisan config:clear`.
 - Empty dashboard or logs: confirm `CLOUDFLARE_MAIL_MONITOR_ZONE_ID` is a zone ID, not an account ID, and that the token has `Analytics Read` for that zone.
+- Empty suppressions page: confirm the zone has Email Sending enabled and that the token can read Email Sending suppressions for that zone.
 - Missing older events: Cloudflare currently documents a 31-day retention window for Email Service analytics; schedule daily fetching to preserve events locally for longer retention.
 - GraphQL errors from Cloudflare: verify Email Service is enabled for the sending domain and that the configured zone has outbound sending activity.
 - Slow or timed-out fetches: lower `CLOUDFLARE_MAIL_MONITOR_FETCH_PAGE_SIZE` or increase `CLOUDFLARE_MAIL_MONITOR_API_TIMEOUT` in the published config.

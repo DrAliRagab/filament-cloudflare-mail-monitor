@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use DrAliRagab\FilamentCloudflareMailMonitor\Data\ConfiguredZone;
 use DrAliRagab\FilamentCloudflareMailMonitor\Data\DateRange;
 use DrAliRagab\FilamentCloudflareMailMonitor\Data\EmailEventData;
+use DrAliRagab\FilamentCloudflareMailMonitor\Data\EmailSuppressionData;
 
 it('rejects missing zone ids', function (): void {
     ConfiguredZone::fromArray(['id' => null]);
@@ -86,6 +87,28 @@ it('normalizes unusual Cloudflare event payload values defensively', function ()
         ->and($emailEventData->sessionId)->toBe('stringable-value')
         ->and($emailEventData->from)->toBeNull()
         ->and($emailEventData->to)->toBeNull();
+
+    CarbonImmutable::setTestNow();
+});
+
+it('normalizes unusual Cloudflare suppression payload values defensively', function (): void {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-04-25T00:00:00Z'));
+
+    $emailSuppressionData = EmailSuppressionData::fromCloudflare(new ConfiguredZone('zone-1'), [
+        'id' => 123,
+        'email' => [],
+        'reason' => null,
+        'created_at' => null,
+        'expires_at' => '',
+        'zones' => [123, 'example.com', []],
+    ]);
+
+    expect($emailSuppressionData->id)->toBe('123')
+        ->and($emailSuppressionData->email)->toBe('')
+        ->and($emailSuppressionData->reason)->toBe('')
+        ->and($emailSuppressionData->createdAt->toIso8601String())->toBe('2026-04-25T00:00:00+00:00')
+        ->and($emailSuppressionData->expiresAt)->toBeNull()
+        ->and($emailSuppressionData->zones)->toBe(['123', 'example.com']);
 
     CarbonImmutable::setTestNow();
 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DrAliRagab\FilamentCloudflareMailMonitor;
 
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailDashboard;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailSuppressions;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
@@ -15,6 +16,8 @@ use Filament\Panel;
 final class CloudflareMailMonitorPlugin implements Plugin
 {
     private bool $hasDashboard = true;
+
+    private bool $hasSuppressionsPage = true;
 
     private bool $hasLogsResource = true;
 
@@ -44,6 +47,13 @@ final class CloudflareMailMonitorPlugin implements Plugin
         return $this;
     }
 
+    public function suppressionsPage(bool $condition = true): self
+    {
+        $this->hasSuppressionsPage = $condition;
+
+        return $this;
+    }
+
     public function statsWidget(bool $condition = true): self
     {
         $this->hasStatsWidget = $condition;
@@ -61,6 +71,11 @@ final class CloudflareMailMonitorPlugin implements Plugin
         return $this->hasLogsResource;
     }
 
+    public function hasSuppressionsPage(): bool
+    {
+        return $this->hasSuppressionsPage;
+    }
+
     public function hasStatsWidget(): bool
     {
         return $this->hasStatsWidget;
@@ -70,6 +85,10 @@ final class CloudflareMailMonitorPlugin implements Plugin
     {
         if ($this->hasDashboard) {
             $panel->pages([CloudflareMailDashboard::class]);
+        }
+
+        if ($this->hasSuppressionsPage) {
+            $panel->pages([CloudflareMailSuppressions::class]);
         }
 
         if ($this->hasLogsResource) {
