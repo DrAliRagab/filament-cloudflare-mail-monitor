@@ -44,17 +44,18 @@ final readonly class EmailSuppressionData
     /**
      * @return array<string, mixed>
      */
-    public function toArray(): array
+    public function toDatabaseAttributes(): array
     {
         return [
-            'id' => $this->id,
+            'suppression_id' => $this->id,
             'email' => $this->email,
             'reason' => $this->reason,
-            'created_at' => $this->createdAt->toIso8601String(),
-            'expires_at' => $this->expiresAt?->toIso8601String(),
+            'suppressed_at' => $this->createdAt,
+            'expires_at' => $this->expiresAt,
             'zone_id' => $this->zone->id,
-            'zone_name' => $this->zone->name ?? $this->zone->id,
-            'zones' => $this->zones,
+            'zone_name' => $this->zone->name,
+            'cloudflare_zones' => $this->zones,
+            'raw' => $this->raw,
         ];
     }
 

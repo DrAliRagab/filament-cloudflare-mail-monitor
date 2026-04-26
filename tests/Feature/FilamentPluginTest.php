@@ -6,17 +6,19 @@ use Carbon\CarbonImmutable;
 use DrAliRagab\FilamentCloudflareMailMonitor\CloudflareMailMonitorPlugin;
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailDashboard;
-use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailSuppressions;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource\Pages\ListCloudflareMailEvents;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource\Pages\ViewCloudflareMailEvent;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailSuppressionResource;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailSuppressionResource\Pages\ListCloudflareMailSuppressions;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailSuppressionResource\Pages\ViewCloudflareMailSuppression;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
+use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailSuppression;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSummary;
-use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSuppressionFetcher;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Privacy;
 use Filament\Panel;
 use Filament\Schemas\Schema;
@@ -35,8 +37,8 @@ it('registers Filament pages resources and widgets by default', function (): voi
     CloudflareMailMonitorPlugin::make()->register($panel);
 
     expect($panel->getPages())->toContain(CloudflareMailDashboard::class)
-        ->and($panel->getPages())->toContain(CloudflareMailSuppressions::class)
         ->and($panel->getResources())->toContain(CloudflareMailEventResource::class)
+        ->and($panel->getResources())->toContain(CloudflareMailSuppressionResource::class)
         ->and($panel->getWidgets())->toContain(CloudflareMailStatsOverview::class)
         ->and($panel->getWidgets())->toContain(CloudflareMailFailureOverview::class)
         ->and($panel->getWidgets())->toContain(CloudflareMailAuthenticationOverview::class);
@@ -46,7 +48,7 @@ it('can disable Filament plugin parts fluently', function (): void {
     $panel = Panel::make()->id('admin');
     $cloudflareMailMonitorPlugin = CloudflareMailMonitorPlugin::make()
         ->dashboard(false)
-        ->suppressionsPage(false)
+        ->suppressionsResource(false)
         ->logsResource(false)
         ->statsWidget(false);
 
@@ -54,12 +56,12 @@ it('can disable Filament plugin parts fluently', function (): void {
 
     expect($cloudflareMailMonitorPlugin->getId())->toBe('cloudflare-mail-monitor')
         ->and($cloudflareMailMonitorPlugin->hasDashboard())->toBeFalse()
-        ->and($cloudflareMailMonitorPlugin->hasSuppressionsPage())->toBeFalse()
+        ->and($cloudflareMailMonitorPlugin->hasSuppressionsResource())->toBeFalse()
         ->and($cloudflareMailMonitorPlugin->hasLogsResource())->toBeFalse()
         ->and($cloudflareMailMonitorPlugin->hasStatsWidget())->toBeFalse()
         ->and($panel->getPages())->not->toContain(CloudflareMailDashboard::class)
-        ->and($panel->getPages())->not->toContain(CloudflareMailSuppressions::class)
         ->and($panel->getResources())->not->toContain(CloudflareMailEventResource::class)
+        ->and($panel->getResources())->not->toContain(CloudflareMailSuppressionResource::class)
         ->and($panel->getWidgets())->not->toContain(CloudflareMailStatsOverview::class)
         ->and($panel->getWidgets())->not->toContain(CloudflareMailFailureOverview::class)
         ->and($panel->getWidgets())->not->toContain(CloudflareMailAuthenticationOverview::class);
@@ -78,11 +80,13 @@ it('uses configurable Filament navigation values', function (): void {
         ->and(CloudflareMailDashboard::getNavigationIcon())->toBe('heroicon-o-chart-pie')
         ->and(CloudflareMailDashboard::getNavigationSort())->toBe(10)
         ->and(CloudflareMailDashboard::shouldRegisterNavigation())->toBeFalse()
-        ->and(CloudflareMailSuppressions::getNavigationLabel())->toBe('Suppressions')
-        ->and(CloudflareMailSuppressions::getNavigationGroup())->toBe('Ops')
-        ->and(CloudflareMailSuppressions::getNavigationIcon())->toBe('heroicon-o-no-symbol')
-        ->and(CloudflareMailSuppressions::getNavigationSort())->toBe(12)
-        ->and(CloudflareMailSuppressions::shouldRegisterNavigation())->toBeFalse()
+        ->and(CloudflareMailSuppressionResource::getNavigationLabel())->toBe('Suppressions')
+        ->and(CloudflareMailSuppressionResource::getModelLabel())->toBe('suppression')
+        ->and(CloudflareMailSuppressionResource::getPluralModelLabel())->toBe('suppressions')
+        ->and(CloudflareMailSuppressionResource::getNavigationGroup())->toBe('Ops')
+        ->and(CloudflareMailSuppressionResource::getNavigationIcon())->toBe('heroicon-o-no-symbol')
+        ->and(CloudflareMailSuppressionResource::getNavigationSort())->toBe(12)
+        ->and(CloudflareMailSuppressionResource::shouldRegisterNavigation())->toBeFalse()
         ->and(CloudflareMailEventResource::getNavigationLabel())->toBe('Email Logs')
         ->and(CloudflareMailEventResource::getModelLabel())->toBe('email log')
         ->and(CloudflareMailEventResource::getPluralModelLabel())->toBe('email logs')
@@ -460,100 +464,86 @@ it('refreshes Cloudflare mail events from the dashboard action target', function
     expect(CloudflareMailEvent::query()->where('message_id', 'dashboard-refresh')->exists())->toBeTrue();
 });
 
-it('exposes a refresh action on the suppressions page', function (): void {
-    $actions = Closure::bind(static fn (): array => app(CloudflareMailSuppressions::class)->getHeaderActions(), null, CloudflareMailSuppressions::class)();
+it('configures the email suppressions table and pages', function (): void {
+    config()->set('cloudflare-mail-monitor.zones', [
+        ['id' => 'zone-1', 'name' => 'example.com'],
+        ['id' => 'zone-2'],
+    ]);
+
+    CloudflareMailSuppression::query()->create([
+        'suppression_id' => 'suppression-1',
+        'zone_id' => 'zone-1',
+        'zone_name' => 'example.com',
+        'email' => 'person@example.com',
+        'reason' => 'hard_bounce',
+        'suppressed_at' => CarbonImmutable::parse('2026-04-25T10:00:00Z'),
+        'cloudflare_zones' => ['example.com'],
+        'raw' => ['id' => 'suppression-1'],
+    ]);
+
+    $table = Table::make(Mockery::mock(HasTable::class));
+    $configuredTable = CloudflareMailSuppressionResource::table($table);
+
+    expect($configuredTable)->toBeInstanceOf(Table::class)
+        ->and(CloudflareMailSuppressionResource::getPages())->toHaveKey('index')
+        ->and(CloudflareMailSuppressionResource::getPages())->toHaveKey('view')
+        ->and(CloudflareMailSuppressionResource::getPages()['view']->getPage())->toBe(ViewCloudflareMailSuppression::class)
+        ->and($configuredTable->getFilters())->toHaveKeys(['zone_id', 'reason', 'suppressed_at'])
+        ->and(CloudflareMailSuppressionResource::zoneFilterOptions())->toBe([
+            'zone-1' => 'example.com',
+            'zone-2' => 'zone-2',
+        ])->and(CloudflareMailSuppressionResource::reasonFilterOptions())->toBe([
+            'hard_bounce' => 'Hard Bounce',
+        ]);
+});
+
+it('filters email suppressions by suppressed date ranges', function (): void {
+    CloudflareMailSuppression::query()->create([
+        'suppression_id' => 'suppression-1',
+        'zone_id' => 'zone-1',
+        'email' => 'one@example.com',
+        'reason' => 'hard_bounce',
+        'suppressed_at' => CarbonImmutable::parse('2026-04-20T10:00:00Z'),
+    ]);
+
+    CloudflareMailSuppression::query()->create([
+        'suppression_id' => 'suppression-2',
+        'zone_id' => 'zone-1',
+        'email' => 'two@example.com',
+        'reason' => 'manual',
+        'suppressed_at' => CarbonImmutable::parse('2026-04-25T10:00:00Z'),
+    ]);
+
+    $table = CloudflareMailSuppressionResource::table(Table::make(Mockery::mock(HasTable::class)));
+    $dateFilter = $table->getFilter('suppressed_at');
+
+    if (! $dateFilter instanceof BaseFilter) {
+        throw new RuntimeException('The suppressed_at filter was not registered.');
+    }
+
+    $suppressionIds = $dateFilter
+        ->apply(CloudflareMailSuppression::query(), ['from' => '2026-04-21', 'until' => '2026-04-30'])
+        ->pluck('suppression_id')
+        ->all();
+
+    expect($suppressionIds)->toBe(['suppression-2']);
+});
+
+it('links email suppressions to the detail page', function (): void {
+    $table = CloudflareMailSuppressionResource::table(Table::make(Mockery::mock(HasTable::class)));
+
+    expect($table->hasCustomRecordUrl())->toBeTrue();
+});
+
+it('exposes a refresh action on the suppressions list page', function (): void {
+    $actions = Closure::bind(static fn (): array => app(ListCloudflareMailSuppressions::class)->getHeaderActions(), null, ListCloudflareMailSuppressions::class)();
 
     expect($actions)->toHaveCount(1)
         ->and($actions[0]->getName())->toBe('refresh')
         ->and($actions[0]->getLabel())->toBe('Refresh suppressions');
 });
 
-it('loads suppression rows for the configured zones', function (): void {
-    config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
-    config()->set('cloudflare-mail-monitor.privacy.mask_email_addresses', true);
-    config()->set('cloudflare-mail-monitor.zones', [
-        ['id' => 'zone-1', 'name' => 'example.com'],
-    ]);
-
-    Http::fake([
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
-            'result' => [[
-                'id' => 'suppression-1',
-                'email' => 'person@example.com',
-                'reason' => 'hard_bounce',
-                'created_at' => '2026-04-25T10:00:00Z',
-                'expires_at' => null,
-                'zones' => ['example.com'],
-            ]],
-        ]),
-    ]);
-
-    $cloudflareMailSuppressions = app(CloudflareMailSuppressions::class);
-    $cloudflareMailSuppressions->loadCloudflareMailSuppressions(sendNotification: false);
-
-    expect($cloudflareMailSuppressions->getTitle())->toBe('Cloudflare Mail Suppressions')
-        ->and($cloudflareMailSuppressions->hasConfiguredMailSuppressions())->toBeTrue()
-        ->and($cloudflareMailSuppressions->suppressionRows())->toHaveCount(1)
-        ->and($cloudflareMailSuppressions->suppressionRows()[0]['email'])->toBe('p***@example.com')
-        ->and($cloudflareMailSuppressions->suppressionRows()[0]['reason'])->toBe('hard_bounce')
-        ->and($cloudflareMailSuppressions->suppressionRows()[0]['zone_name'])->toBe('example.com')
-        ->and($cloudflareMailSuppressions->suppressionRows()[0]['zones_display'])->toBe('example.com');
-});
-
-it('shows suppressions configuration warnings', function (): void {
-    config()->set('cloudflare-mail-monitor.api.token');
-    config()->set('cloudflare-mail-monitor.zones', []);
-
-    $cloudflareMailSuppressions = app(CloudflareMailSuppressions::class);
-
-    expect($cloudflareMailSuppressions->hasConfiguredMailSuppressions())->toBeFalse()
-        ->and($cloudflareMailSuppressions->configurationWarning())->toBe('Set `CLOUDFLARE_MAIL_MONITOR_API_TOKEN` before using the suppression list.');
-});
-
-it('warns when suppression zone configuration is missing', function (): void {
-    config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
-    config()->set('cloudflare-mail-monitor.zones', []);
-
-    expect(app(CloudflareMailSuppressions::class)->configurationWarning())->toBe('Configure at least one zone in `CLOUDFLARE_MAIL_MONITOR_ZONE_ID` or the published config.');
-});
-
-it('stores a permissions warning after a failed suppressions refresh', function (): void {
-    app()->instance(CloudflareMailSuppressionFetcher::class, new class
-    {
-        public function fetch(): array
-        {
-            throw new CloudflareApiException('Cloudflare API request failed with HTTP status 403.', 403);
-        }
-    });
-
-    app(CloudflareMailSuppressions::class)->loadCloudflareMailSuppressions(sendNotification: false);
-
-    expect(session('cloudflare-mail-monitor.last_suppression_error'))->toBe([
-        'type' => CloudflareApiException::class,
-        'status_code' => 403,
-    ])->and(app(CloudflareMailSuppressions::class)->authorizationWarning())->toBe('The Cloudflare API token is missing permission to read Email Sending suppressions for at least one configured zone.');
-});
-
-it('mounts suppressions page without loading when configuration is missing', function (): void {
-    config()->set('cloudflare-mail-monitor.api.token');
-    app()->instance(CloudflareMailSuppressionFetcher::class, new class
-    {
-        public function fetch(): array
-        {
-            throw new RuntimeException('Suppressions should not load when configuration is missing.');
-        }
-    });
-
-    $cloudflareMailSuppressions = app(CloudflareMailSuppressions::class);
-    $cloudflareMailSuppressions->mount();
-
-    expect($cloudflareMailSuppressions->suppressions)->toBe([]);
-});
-
-it('mounts suppressions page and loads rows when configuration is present', function (): void {
+it('refreshes the suppressions list page cache after fetching', function (): void {
     config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
     config()->set('cloudflare-mail-monitor.zones', [
         ['id' => 'zone-1', 'name' => 'example.com'],
@@ -575,91 +565,77 @@ it('mounts suppressions page and loads rows when configuration is present', func
         ]),
     ]);
 
-    $cloudflareMailSuppressions = app(CloudflareMailSuppressions::class);
-    $cloudflareMailSuppressions->mount();
+    $listCloudflareMailSuppressions = app(ListCloudflareMailSuppressions::class);
+    $listCloudflareMailSuppressions->refreshCloudflareMailSuppressions();
 
-    expect($cloudflareMailSuppressions->configurationWarning())->toBeNull()
-        ->and($cloudflareMailSuppressions->suppressions)->toHaveCount(1);
+    expect(CloudflareMailSuppression::query()->where('suppression_id', 'suppression-1')->exists())->toBeTrue();
 });
 
-it('refreshes suppressions through the page action target', function (): void {
+it('exposes a refresh action on the suppression detail page', function (): void {
+    $actions = Closure::bind(static fn (): array => app(ViewCloudflareMailSuppression::class)->getHeaderActions(), null, ViewCloudflareMailSuppression::class)();
+
+    expect($actions)->toHaveCount(1)
+        ->and($actions[0]->getName())->toBe('refresh')
+        ->and($actions[0]->getLabel())->toBe('Refresh suppressions');
+});
+
+it('refreshes the current suppression record after fetching', function (): void {
     config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
     config()->set('cloudflare-mail-monitor.zones', [
         ['id' => 'zone-1', 'name' => 'example.com'],
     ]);
 
-    Http::fake([
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
-            'result' => [[
-                'id' => 'suppression-1',
-                'email' => 'person@example.com',
-                'reason' => 'hard_bounce',
-                'created_at' => '2026-04-25T10:00:00Z',
-                'expires_at' => null,
-                'zones' => ['example.com'],
-            ]],
-        ]),
-    ]);
-
-    $cloudflareMailSuppressions = app(CloudflareMailSuppressions::class);
-    $cloudflareMailSuppressions->refreshCloudflareMailSuppressions();
-
-    expect($cloudflareMailSuppressions->suppressions)->toHaveCount(1);
-});
-
-it('stores a visible permissions warning after a failed suppressions refresh', function (): void {
-    app()->instance(CloudflareMailSuppressionFetcher::class, new class
-    {
-        public function fetch(): array
-        {
-            throw new CloudflareApiException('Cloudflare API request failed with HTTP status 403.', 403);
-        }
-    });
-
-    $cloudflareMailSuppressions = app(CloudflareMailSuppressions::class);
-    $cloudflareMailSuppressions->refreshCloudflareMailSuppressions();
-
-    expect($cloudflareMailSuppressions->authorizationWarning())->toBe('The Cloudflare API token is missing permission to read Email Sending suppressions for at least one configured zone.');
-});
-
-it('does not show a suppression permissions warning without an authorization failure', function (): void {
-    session()->forget('cloudflare-mail-monitor.last_suppression_error');
-
-    expect(app(CloudflareMailSuppressions::class)->authorizationWarning())->toBeNull();
-
-    session()->put('cloudflare-mail-monitor.last_suppression_error', [
-        'type' => 'other',
-        'status_code' => 403,
-    ]);
-
-    expect(app(CloudflareMailSuppressions::class)->authorizationWarning())->toBeNull();
-
-    session()->put('cloudflare-mail-monitor.last_suppression_error', [
-        'type' => CloudflareApiException::class,
-        'status_code' => 500,
-    ]);
-
-    expect(app(CloudflareMailSuppressions::class)->authorizationWarning())->toBeNull();
-});
-
-it('formats suppression rows defensively', function (): void {
-    $cloudflareMailSuppressions = app(CloudflareMailSuppressions::class);
-    $cloudflareMailSuppressions->suppressions = [[
-        'id' => 'suppression-1',
-        'email' => [],
-        'reason' => 'hard_bounce',
-        'created_at' => '2026-04-25T10:00:00Z',
-        'expires_at' => null,
+    $cloudflareMailSuppression = CloudflareMailSuppression::query()->create([
+        'suppression_id' => 'suppression-1',
         'zone_id' => 'zone-1',
         'zone_name' => 'example.com',
-        'zones' => 'not-a-list',
-    ]];
+        'email' => 'person@example.com',
+        'reason' => 'hard_bounce',
+        'suppressed_at' => CarbonImmutable::parse('2026-04-25T10:00:00Z'),
+    ]);
 
-    expect($cloudflareMailSuppressions->suppressionRows()[0]['email'])->toBeNull()
-        ->and($cloudflareMailSuppressions->suppressionRows()[0]['zones_display'])->toBe('');
+    Http::fake([
+        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
+            'page' => 1,
+            'per_page' => 100,
+            'total' => 1,
+            'result' => [[
+                'id' => 'suppression-1',
+                'email' => 'person@example.com',
+                'reason' => 'manual',
+                'created_at' => '2026-04-25T10:00:00Z',
+                'expires_at' => null,
+                'zones' => ['example.com'],
+            ]],
+        ]),
+    ]);
+
+    $viewCloudflareMailSuppression = app(ViewCloudflareMailSuppression::class);
+    $viewCloudflareMailSuppression->record = $cloudflareMailSuppression;
+    $viewCloudflareMailSuppression->refreshCloudflareMailSuppressions();
+
+    expect($viewCloudflareMailSuppression->record->reason)->toBe('manual');
+});
+
+it('builds the email suppression infolist', function (): void {
+    $schema = CloudflareMailSuppressionResource::infolist(Schema::make());
+    $components = $schema->getComponents();
+
+    expect($components)->not->toBeEmpty()
+        ->and(CloudflareMailSuppressionResource::formatStringList(['example.com', 123, []]))->toBe('example.com, 123')
+        ->and(CloudflareMailSuppressionResource::formatStringList('not-a-list'))->toBeNull()
+        ->and(CloudflareMailSuppressionResource::formatRawPayload(['foo' => 'bar']))->toBe("{\n    \"foo\": \"bar\"\n}")
+        ->and(CloudflareMailSuppressionResource::formatRawPayload('{"foo":"bar"}'))->toBe("{\n    \"foo\": \"bar\"\n}")
+        ->and(CloudflareMailSuppressionResource::formatRawPayload(7))->toBe('7')
+        ->and(CloudflareMailSuppressionResource::formatRawPayload(new class implements Stringable
+        {
+            public function __toString(): string
+            {
+                return 'stringable-value';
+            }
+        }))->toBe('stringable-value')
+        ->and(CloudflareMailSuppressionResource::formatRawPayload(new stdClass))->toBeNull()
+        ->and(CloudflareMailSuppressionResource::formatRawPayload(null))->toBeNull();
 });
 
 it('boots the plugin without side effects', function (): void {

@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\MissingCloudflareConfiguration;
+use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailSuppression;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSuppressionFetcher;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
+    $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+
     config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
     config()->set('cloudflare-mail-monitor.suppressions.page_size', 2);
     config()->set('cloudflare-mail-monitor.zones', [
@@ -71,14 +74,14 @@ it('fetches email sending suppressions for configured zones', function (): void 
         ]),
     ]);
 
-    $suppressions = app(CloudflareMailSuppressionFetcher::class)->fetch();
+    $stored = app(CloudflareMailSuppressionFetcher::class)->fetch();
 
-    expect($suppressions)->toHaveCount(4)
-        ->and($suppressions[0]->id)->toBe('suppression-1')
-        ->and($suppressions[0]->email)->toBe('one@example.com')
-        ->and($suppressions[0]->zone->id)->toBe('zone-1')
-        ->and($suppressions[1]->expiresAt?->toIso8601String())->toBe('2026-05-25T11:00:00+00:00')
-        ->and($suppressions[3]->zone->name)->toBe('example.net');
+    expect($stored)->toBe(4)
+        ->and(CloudflareMailSuppression::query()->count())->toBe(4)
+        ->and(CloudflareMailSuppression::query()->where('suppression_id', 'suppression-1')->value('email'))->toBe('one@example.com')
+        ->and(CloudflareMailSuppression::query()->where('suppression_id', 'suppression-1')->value('zone_id'))->toBe('zone-1')
+        ->and(CloudflareMailSuppression::query()->where('suppression_id', 'suppression-2')->first()?->expires_at?->toIso8601String())->toBe('2026-05-25T11:00:00+00:00')
+        ->and(CloudflareMailSuppression::query()->where('suppression_id', 'suppression-4')->value('zone_name'))->toBe('example.net');
 
     Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/zones/zone-1/email/sending/suppression')
         && str_contains($request->url(), 'page=1')
@@ -112,10 +115,10 @@ it('ignores malformed suppression entries', function (): void {
         ]),
     ]);
 
-    $suppressions = app(CloudflareMailSuppressionFetcher::class)->fetch();
+    $stored = app(CloudflareMailSuppressionFetcher::class)->fetch();
 
-    expect($suppressions)->toHaveCount(1)
-        ->and($suppressions[0]->zones)->toBe([]);
+    expect($stored)->toBe(1)
+        ->and(CloudflareMailSuppression::query()->first()?->cloudflare_zones)->toBe([]);
 });
 
 it('uses fallback pagination totals when Cloudflare omits totals', function (): void {
@@ -138,7 +141,7 @@ it('uses fallback pagination totals when Cloudflare omits totals', function (): 
         ]),
     ]);
 
-    expect(app(CloudflareMailSuppressionFetcher::class)->fetch())->toHaveCount(1);
+    expect(app(CloudflareMailSuppressionFetcher::class)->fetch())->toBe(1);
 });
 
 it('normalizes string pagination totals from Cloudflare', function (): void {
@@ -162,7 +165,7 @@ it('normalizes string pagination totals from Cloudflare', function (): void {
         ]),
     ]);
 
-    expect(app(CloudflareMailSuppressionFetcher::class)->fetch())->toHaveCount(1);
+    expect(app(CloudflareMailSuppressionFetcher::class)->fetch())->toBe(1);
 });
 
 it('fails safely when Cloudflare rejects a suppression request', function (): void {

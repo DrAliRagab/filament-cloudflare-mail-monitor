@@ -8,6 +8,7 @@ use DrAliRagab\FilamentCloudflareMailMonitor\Data\ConfiguredZone;
 use DrAliRagab\FilamentCloudflareMailMonitor\Data\EmailSuppressionData;
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\MissingCloudflareConfiguration;
+use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailSuppression;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Config;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Arr;
@@ -18,26 +19,33 @@ final readonly class CloudflareMailSuppressionFetcher
         private HttpFactory $httpFactory,
     ) {}
 
-    /**
-     * @return list<EmailSuppressionData>
-     */
-    public function fetch(): array
+    public function fetch(): int
     {
-        $suppressions = [];
+        $stored = 0;
 
         foreach (Config::zones() as $zoneConfig) {
             $zone = ConfiguredZone::fromArray($zoneConfig);
 
-            $suppressions = [...$suppressions, ...$this->fetchForZone($zone)];
+            foreach ($this->suppressionsForZone($zone) as $suppression) {
+                CloudflareMailSuppression::query()->updateOrCreate(
+                    [
+                        'zone_id' => $suppression->zone->id,
+                        'suppression_id' => $suppression->id,
+                    ],
+                    $suppression->toDatabaseAttributes(),
+                );
+
+                ++$stored;
+            }
         }
 
-        return $suppressions;
+        return $stored;
     }
 
     /**
      * @return list<EmailSuppressionData>
      */
-    private function fetchForZone(ConfiguredZone $configuredZone): array
+    private function suppressionsForZone(ConfiguredZone $configuredZone): array
     {
         $page = 1;
         $perPage = min(max(Config::integer('suppressions.page_size', 100), 1), 1000);

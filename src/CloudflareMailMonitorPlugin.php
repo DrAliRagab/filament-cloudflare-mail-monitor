@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace DrAliRagab\FilamentCloudflareMailMonitor;
 
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailDashboard;
-use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Pages\CloudflareMailSuppressions;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailEventResource;
+use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Resources\CloudflareMailSuppressionResource;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailAuthenticationOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailFailureOverview;
 use DrAliRagab\FilamentCloudflareMailMonitor\Filament\Widgets\CloudflareMailStatsOverview;
@@ -17,7 +17,7 @@ final class CloudflareMailMonitorPlugin implements Plugin
 {
     private bool $hasDashboard = true;
 
-    private bool $hasSuppressionsPage = true;
+    private bool $hasSuppressionsResource = true;
 
     private bool $hasLogsResource = true;
 
@@ -47,9 +47,9 @@ final class CloudflareMailMonitorPlugin implements Plugin
         return $this;
     }
 
-    public function suppressionsPage(bool $condition = true): self
+    public function suppressionsResource(bool $condition = true): self
     {
-        $this->hasSuppressionsPage = $condition;
+        $this->hasSuppressionsResource = $condition;
 
         return $this;
     }
@@ -71,9 +71,9 @@ final class CloudflareMailMonitorPlugin implements Plugin
         return $this->hasLogsResource;
     }
 
-    public function hasSuppressionsPage(): bool
+    public function hasSuppressionsResource(): bool
     {
-        return $this->hasSuppressionsPage;
+        return $this->hasSuppressionsResource;
     }
 
     public function hasStatsWidget(): bool
@@ -87,12 +87,12 @@ final class CloudflareMailMonitorPlugin implements Plugin
             $panel->pages([CloudflareMailDashboard::class]);
         }
 
-        if ($this->hasSuppressionsPage) {
-            $panel->pages([CloudflareMailSuppressions::class]);
-        }
-
         if ($this->hasLogsResource) {
             $panel->resources([CloudflareMailEventResource::class]);
+        }
+
+        if ($this->hasSuppressionsResource) {
+            $panel->resources([CloudflareMailSuppressionResource::class]);
         }
 
         if ($this->hasStatsWidget) {

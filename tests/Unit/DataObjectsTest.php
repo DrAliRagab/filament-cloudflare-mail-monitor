@@ -108,7 +108,18 @@ it('normalizes unusual Cloudflare suppression payload values defensively', funct
         ->and($emailSuppressionData->reason)->toBe('')
         ->and($emailSuppressionData->createdAt->toIso8601String())->toBe('2026-04-25T00:00:00+00:00')
         ->and($emailSuppressionData->expiresAt)->toBeNull()
-        ->and($emailSuppressionData->zones)->toBe(['123', 'example.com']);
+        ->and($emailSuppressionData->zones)->toBe(['123', 'example.com'])
+        ->and($emailSuppressionData->toDatabaseAttributes())->toHaveKeys([
+            'suppression_id',
+            'email',
+            'reason',
+            'suppressed_at',
+            'expires_at',
+            'zone_id',
+            'zone_name',
+            'cloudflare_zones',
+            'raw',
+        ]);
 
     CarbonImmutable::setTestNow();
 });

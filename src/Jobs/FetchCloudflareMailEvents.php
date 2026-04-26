@@ -6,6 +6,7 @@ namespace DrAliRagab\FilamentCloudflareMailMonitor\Jobs;
 
 use DrAliRagab\FilamentCloudflareMailMonitor\Data\DateRange;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
+use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSuppressionFetcher;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Config;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,7 +32,7 @@ final class FetchCloudflareMailEvents implements ShouldQueue
         public readonly ?int $lookbackDays = null,
     ) {}
 
-    public function handle(CloudflareMailEventFetcher $cloudflareMailEventFetcher): void
+    public function handle(CloudflareMailEventFetcher $cloudflareMailEventFetcher, CloudflareMailSuppressionFetcher $cloudflareMailSuppressionFetcher): void
     {
         $range = $this->lookbackDays === null
             ? null
@@ -41,5 +42,6 @@ final class FetchCloudflareMailEvents implements ShouldQueue
             );
 
         $cloudflareMailEventFetcher->fetch($range);
+        $cloudflareMailSuppressionFetcher->fetch();
     }
 }
