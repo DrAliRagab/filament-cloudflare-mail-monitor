@@ -129,6 +129,21 @@ CloudflareMailMonitorPlugin::make()
 
 Pass `false` to any of these methods to disable that part.
 
+## Events
+
+The package dispatches `CloudflareMailSuppressionCreated` after a new suppression row is committed locally. Existing suppression rows updated during later syncs do not dispatch the event again.
+
+```php
+use DrAliRagab\FilamentCloudflareMailMonitor\Events\CloudflareMailSuppressionCreated;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(CloudflareMailSuppressionCreated::class, function (CloudflareMailSuppressionCreated $event): void {
+    $suppression = $event->suppression;
+
+    // Sync your local allow/block list, notify a team, or update another system.
+});
+```
+
 ## Programmatic Metrics
 
 The package stores individual events locally through `CloudflareMailEventFetcher`. It also exposes `CloudflareMailAggregateFetcher` for on-demand aggregate status counts from Cloudflare's `emailSendingAdaptiveGroups` dataset.

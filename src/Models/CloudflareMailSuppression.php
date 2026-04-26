@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Models;
 
 use Carbon\CarbonImmutable;
+use DrAliRagab\FilamentCloudflareMailMonitor\Events\CloudflareMailSuppressionCreated;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
@@ -28,6 +29,13 @@ final class CloudflareMailSuppression extends Model
     use Prunable;
 
     protected $table = 'cloudflare_mail_monitor_suppressions';
+
+    /**
+     * @var array<string, class-string>
+     */
+    protected $dispatchesEvents = [
+        'created' => CloudflareMailSuppressionCreated::class,
+    ];
 
     /**
      * @var list<string>

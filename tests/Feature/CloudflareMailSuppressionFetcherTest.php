@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use DrAliRagab\FilamentCloudflareMailMonitor\Events\CloudflareMailSuppressionCreated;
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\MissingCloudflareConfiguration;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailSuppression;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSuppressionFetcher;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
@@ -166,6 +168,45 @@ it('normalizes string pagination totals from Cloudflare', function (): void {
     ]);
 
     expect(app(CloudflareMailSuppressionFetcher::class)->fetch())->toBe(1);
+});
+
+it('dispatches an event only when a suppression is newly stored', function (): void {
+    config()->set('cloudflare-mail-monitor.zones', [
+        ['id' => 'zone-1', 'name' => 'example.com'],
+    ]);
+
+    Http::fake([
+        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
+            'page' => 1,
+            'per_page' => 2,
+            'total' => 1,
+            'result' => [[
+                'id' => 'suppression-1',
+                'email' => 'one@example.com',
+                'reason' => 'hard_bounce',
+                'created_at' => '2026-04-25T10:00:00Z',
+                'expires_at' => null,
+                'zones' => ['example.com'],
+            ]],
+        ]),
+    ]);
+
+    Event::fake([CloudflareMailSuppressionCreated::class]);
+
+    expect(app(CloudflareMailSuppressionFetcher::class)->fetch())->toBe(1);
+
+    Event::assertDispatched(
+        CloudflareMailSuppressionCreated::class,
+        fn (CloudflareMailSuppressionCreated $cloudflareMailSuppressionCreated): bool => $cloudflareMailSuppressionCreated->suppression->suppression_id === 'suppression-1'
+            && $cloudflareMailSuppressionCreated->suppression->email === 'one@example.com'
+    );
+    Event::assertDispatchedTimes(CloudflareMailSuppressionCreated::class);
+
+    Event::fake([CloudflareMailSuppressionCreated::class]);
+
+    expect(app(CloudflareMailSuppressionFetcher::class)->fetch())->toBe(1);
+
+    Event::assertNotDispatched(CloudflareMailSuppressionCreated::class);
 });
 
 it('fails safely when Cloudflare rejects a suppression request', function (): void {
