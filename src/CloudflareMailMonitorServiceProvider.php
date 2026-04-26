@@ -20,7 +20,10 @@ final class CloudflareMailMonitorServiceProvider extends PackageServiceProvider
             ->name(self::$name)
             ->hasConfigFile()
             ->hasViews('filament-cloudflare-mail-monitor')
-            ->hasMigration('create_cloudflare_mail_monitor_events_table')
+            ->hasMigrations([
+                'create_cloudflare_mail_monitor_events_table',
+                'create_cloudflare_mail_monitor_suppressions_table',
+            ])
             ->hasCommands([
                 FetchCloudflareMailEventsCommand::class,
                 PruneCloudflareMailEventsCommand::class,

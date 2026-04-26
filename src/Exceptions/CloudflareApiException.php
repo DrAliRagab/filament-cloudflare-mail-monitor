@@ -38,6 +38,11 @@ final class CloudflareApiException extends CloudflareMailMonitorException
         return new self('Cloudflare API returned a malformed GraphQL response.');
     }
 
+    public static function forMalformedRestResponse(): self
+    {
+        return new self('Cloudflare API returned a malformed REST response.');
+    }
+
     public function isAuthorizationFailure(): bool
     {
         return in_array($this->statusCode, [401, 403], true)

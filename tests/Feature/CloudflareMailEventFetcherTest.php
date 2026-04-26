@@ -5,7 +5,9 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use DrAliRagab\FilamentCloudflareMailMonitor\Jobs\FetchCloudflareMailEvents;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
+use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailSuppression;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
+use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSuppressionFetcher;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
@@ -46,6 +48,19 @@ it('fetches Cloudflare events and upserts them by event hash', function (): void
                     ]],
                 ],
             ],
+        ]),
+        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
+            'page' => 1,
+            'per_page' => 100,
+            'total' => 1,
+            'result' => [[
+                'id' => 'suppression-command',
+                'email' => 'person@example.com',
+                'reason' => 'hard_bounce',
+                'created_at' => '2026-04-25T10:00:00Z',
+                'expires_at' => null,
+                'zones' => ['example.com'],
+            ]],
         ]),
     ]);
 
@@ -135,6 +150,19 @@ it('ignores malformed event lists without failing the whole fetch', function ():
                 ],
             ],
         ]),
+        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
+            'page' => 1,
+            'per_page' => 100,
+            'total' => 1,
+            'result' => [[
+                'id' => 'suppression-command',
+                'email' => 'person@example.com',
+                'reason' => 'hard_bounce',
+                'created_at' => '2026-04-25T10:00:00Z',
+                'expires_at' => null,
+                'zones' => ['example.com'],
+            ]],
+        ]),
     ]);
 
     expect(app(CloudflareMailEventFetcher::class)->fetch())->toBe(0)
@@ -154,6 +182,19 @@ it('skips malformed items inside Cloudflare event lists', function (): void {
                     ]],
                 ],
             ],
+        ]),
+        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
+            'page' => 1,
+            'per_page' => 100,
+            'total' => 1,
+            'result' => [[
+                'id' => 'suppression-command',
+                'email' => 'person@example.com',
+                'reason' => 'hard_bounce',
+                'created_at' => '2026-04-25T10:00:00Z',
+                'expires_at' => null,
+                'zones' => ['example.com'],
+            ]],
         ]),
     ]);
 
@@ -189,12 +230,26 @@ it('fetch command stores events synchronously', function (): void {
                 ],
             ],
         ]),
+        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
+            'page' => 1,
+            'per_page' => 100,
+            'total' => 1,
+            'result' => [[
+                'id' => 'suppression-command',
+                'email' => 'person@example.com',
+                'reason' => 'hard_bounce',
+                'created_at' => '2026-04-25T10:00:00Z',
+                'expires_at' => null,
+                'zones' => ['example.com'],
+            ]],
+        ]),
     ]);
 
     $this->artisan('cloudflare-mail-monitor:fetch')
         ->assertSuccessful();
 
-    expect(CloudflareMailEvent::query()->where('message_id', 'message-command')->exists())->toBeTrue();
+    expect(CloudflareMailEvent::query()->where('message_id', 'message-command')->exists())->toBeTrue()
+        ->and(CloudflareMailSuppression::query()->where('suppression_id', 'suppression-command')->exists())->toBeTrue();
 });
 
 it('fetch job stores events with a requested lookback range', function (): void {
@@ -211,12 +266,26 @@ it('fetch job stores events with a requested lookback range', function (): void 
                 ],
             ],
         ]),
+        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
+            'page' => 1,
+            'per_page' => 100,
+            'total' => 1,
+            'result' => [[
+                'id' => 'suppression-job',
+                'email' => 'person@example.com',
+                'reason' => 'hard_bounce',
+                'created_at' => '2026-04-25T10:00:00Z',
+                'expires_at' => null,
+                'zones' => ['example.com'],
+            ]],
+        ]),
     ]);
 
     app(FetchCloudflareMailEvents::class, ['lookbackDays' => 2])
-        ->handle(app(CloudflareMailEventFetcher::class));
+        ->handle(app(CloudflareMailEventFetcher::class), app(CloudflareMailSuppressionFetcher::class));
 
-    expect(CloudflareMailEvent::query()->where('message_id', 'message-job')->exists())->toBeTrue();
+    expect(CloudflareMailEvent::query()->where('message_id', 'message-job')->exists())->toBeTrue()
+        ->and(CloudflareMailSuppression::query()->where('suppression_id', 'suppression-job')->exists())->toBeTrue();
 });
 
 it('fetch job stores events with the default configured range', function (): void {
@@ -233,10 +302,16 @@ it('fetch job stores events with the default configured range', function (): voi
                 ],
             ],
         ]),
+        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
+            'page' => 1,
+            'per_page' => 100,
+            'total' => 0,
+            'result' => [],
+        ]),
     ]);
 
     app(FetchCloudflareMailEvents::class)
-        ->handle(app(CloudflareMailEventFetcher::class));
+        ->handle(app(CloudflareMailEventFetcher::class), app(CloudflareMailSuppressionFetcher::class));
 
     expect(CloudflareMailEvent::query()->where('message_id', 'message-job-default')->exists())->toBeTrue();
 });
@@ -289,9 +364,19 @@ it('prunes events through the package prune command', function (): void {
         'occurred_at' => CarbonImmutable::parse('2025-12-01T00:00:00Z'),
     ]);
 
+    CloudflareMailSuppression::query()->create([
+        'suppression_id' => 'expired-suppression',
+        'zone_id' => 'zone-1',
+        'email' => 'person@example.com',
+        'reason' => 'manual',
+        'suppressed_at' => CarbonImmutable::parse('2026-01-01T00:00:00Z'),
+        'expires_at' => CarbonImmutable::parse('2026-04-24T00:00:00Z'),
+    ]);
+
     expect(Artisan::call('cloudflare-mail-monitor:prune'))->toBe(0);
 
-    expect(CloudflareMailEvent::query()->count())->toBe(0);
+    expect(CloudflareMailEvent::query()->count())->toBe(0)
+        ->and(CloudflareMailSuppression::query()->count())->toBe(0);
 
     CarbonImmutable::setTestNow();
 });

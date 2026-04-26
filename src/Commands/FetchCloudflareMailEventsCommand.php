@@ -7,6 +7,7 @@ namespace DrAliRagab\FilamentCloudflareMailMonitor\Commands;
 use DrAliRagab\FilamentCloudflareMailMonitor\Data\DateRange;
 use DrAliRagab\FilamentCloudflareMailMonitor\Jobs\FetchCloudflareMailEvents;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
+use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSuppressionFetcher;
 use DrAliRagab\FilamentCloudflareMailMonitor\Support\Config;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
@@ -17,9 +18,9 @@ final class FetchCloudflareMailEventsCommand extends Command
         {--days= : Override configured lookback days}
         {--queue : Dispatch the fetch job instead of running synchronously}';
 
-    protected $description = 'Fetch outbound Cloudflare Email Service events into the local monitor table.';
+    protected $description = 'Fetch outbound Cloudflare Email Service events and suppressions into local monitor tables.';
 
-    public function handle(CloudflareMailEventFetcher $cloudflareMailEventFetcher): int
+    public function handle(CloudflareMailEventFetcher $cloudflareMailEventFetcher, CloudflareMailSuppressionFetcher $cloudflareMailSuppressionFetcher): int
     {
         $days = $this->option('days') === null
             ? Config::integer('fetch.lookback_days', 1)
@@ -38,14 +39,16 @@ final class FetchCloudflareMailEventsCommand extends Command
 
         if ($this->option('queue')) {
             FetchCloudflareMailEvents::dispatch($days);
-            $this->components->info('Cloudflare mail event fetch job dispatched.');
+            $this->components->info('Cloudflare mail monitor fetch job dispatched.');
 
             return self::SUCCESS;
         }
 
         $stored = $cloudflareMailEventFetcher->fetch($range);
+        $storedSuppressions = $cloudflareMailSuppressionFetcher->fetch();
 
         $this->components->info(sprintf('Stored %d Cloudflare mail event(s).', $stored));
+        $this->components->info(sprintf('Stored %d Cloudflare mail suppression(s).', $storedSuppressions));
 
         return self::SUCCESS;
     }
