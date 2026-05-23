@@ -40,4 +40,4 @@ jobs:
         run: composer update --prefer-dist --no-interaction --no-progress --with-all-dependencies
 
       - name: Run Check
-        run: composer check
+        run: composer verify

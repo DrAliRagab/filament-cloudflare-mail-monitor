@@ -16,7 +16,7 @@ The package must:
 - Keep all user-facing behavior configurable through published config and plugin options.
 - Use strong typing, DTOs, Eloquent models, jobs, commands, and service classes.
 - Test every implementation path, including non-happy paths.
-- Pass `composer check` before each step is considered complete.
+- Pass `composer verify` before each step is considered complete.
 - Commit each completed step with a descriptive message.
 
 ## Cloudflare Source Of Truth
@@ -64,7 +64,7 @@ Primary layers:
 ## Completed Steps
 
 - Initialized git repository and Laravel package skeleton.
-- Added Composer metadata, Laravel package discovery, CI workflow, Pest, Pint, PHPStan, Rector, and strict `composer check` workflow.
+- Added Composer metadata, Laravel package discovery, CI workflow, Pest, Pint, PHPStan, Rector, and strict `composer verify` workflow.
 - Added publishable config with API, zones, fetch, retention, privacy, and Filament settings.
 - Added database migration for `cloudflare_mail_monitor_events`.
 - Added strongly typed DTOs for configured zones, date ranges, and Cloudflare email events.
@@ -83,20 +83,20 @@ Primary layers:
 - Added focused tests for success paths, validation failures, malformed Cloudflare data, token errors, GraphQL errors, queue dispatch, synchronous fetches, pruning, and defensive DTO normalization.
 - Added focused tests for Filament plugin registration, configurable navigation, dashboard refresh, logs table configuration, privacy formatting, summary service, and widget stats.
 - Added Laravel 13 support to Composer constraints and the CI matrix.
-- Verified the current implementation with `composer check` and 99%+ reported coverage.
+- Verified the current implementation with `composer verify` and 99%+ reported coverage.
 
 ## Remaining Main Plan
 
 1. Add final screenshots before a tagged release.
 2. Revalidate against current Cloudflare Email Service docs before release because the product is beta.
-3. Run `composer check` and commit after each completed step.
+3. Run `composer verify` and commit after each completed step.
 
 ## Missing-Part Checklist
 
 The following items must be checked before a release:
 
 - Final README screenshots are still placeholders.
-- CI currently runs `composer check`, but this must be revalidated before tagging.
+- CI currently runs `composer verify`, but this must be revalidated before tagging.
 - Cloudflare Email Service is beta, so query fields and retention should be rechecked before publishing.
 
 ## Quality Gate
@@ -104,7 +104,7 @@ The following items must be checked before a release:
 Every implementation step must pass:
 
 ```bash
-composer check
+composer verify
 ```
 
 This runs:
@@ -114,4 +114,4 @@ This runs:
 - PHPStan at max level with strict type coverage rules
 - Pest with 99% minimum coverage
 
-If Rector or Pint changes files, run `composer check` again until the command is clean and idempotent.
+If Rector or Pint changes files, run `composer verify` again until the command is clean and idempotent.
