@@ -11,5 +11,3 @@
 - Report synchronous suppression API failures without failing successful event imports; retain queued retries.
 
 Upgrade: publish/run migrations, merge the new config key, set the account ID, refresh config caches, and restart workers. See README for details.
-
-Incident references: MDSTER-LARAVEL-2Y, MDSTER-LARAVEL-2Z, ANESTHESIAZONE-M, ANESTHESIAZONE-N, ROASBY-5, ROASBY-6.
