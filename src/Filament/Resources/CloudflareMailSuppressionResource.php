@@ -79,6 +79,8 @@ final class CloudflareMailSuppressionResource extends Resource
                 TextColumn::make('suppressed_at')->dateTime()->sortable(),
                 TextColumn::make('zone_name')->label('Zone')->searchable()->toggleable(),
                 TextColumn::make('email')->formatStateUsing(static fn (?string $state): ?string => Privacy::email($state))->searchable()->sortable(),
+                TextColumn::make('scope_type')->label('Scope')->badge(),
+                TextColumn::make('scope_value')->label('Sending domain')->placeholder('—'),
                 TextColumn::make('reason')->badge()->searchable()->sortable(),
                 TextColumn::make('expires_at')->dateTime()->placeholder('Never')->sortable(),
                 TextColumn::make('suppression_id')->label('Suppression ID')->searchable()->toggleable(isToggledHiddenByDefault: true),
@@ -122,6 +124,9 @@ final class CloudflareMailSuppressionResource extends Resource
             TextEntry::make('zone_name')->label('Zone')->placeholder('Unknown zone'),
             TextEntry::make('zone_id')->label('Zone ID'),
             TextEntry::make('email')->formatStateUsing(static fn (?string $state): ?string => Privacy::email($state)),
+            TextEntry::make('scope_type')->label('Scope')->placeholder('Unknown'),
+            TextEntry::make('scope_value')->label('Sending domain')->placeholder('—'),
+            TextEntry::make('read_only')->label('Read only')->formatStateUsing(static fn (bool $state): string => $state ? 'Yes' : 'No')->placeholder('Unknown'),
             TextEntry::make('reason')->badge(),
             TextEntry::make('suppression_id')->label('Suppression ID'),
             TextEntry::make('cloudflare_zones')

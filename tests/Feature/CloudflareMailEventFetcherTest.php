@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
+use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Jobs\FetchCloudflareMailEvents;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailEvent;
 use DrAliRagab\FilamentCloudflareMailMonitor\Models\CloudflareMailSuppression;
@@ -10,6 +11,7 @@ use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSuppressionFetcher;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
@@ -17,6 +19,7 @@ beforeEach(function (): void {
     $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
 
     config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.account_id', 'account-1');
     config()->set('cloudflare-mail-monitor.fetch.page_size', 50);
     config()->set('cloudflare-mail-monitor.zones', [
         ['id' => 'zone-1', 'name' => 'example.com'],
@@ -49,17 +52,16 @@ it('fetches Cloudflare events and upserts them by event hash', function (): void
                 ],
             ],
         ]),
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
+        'api.cloudflare.com/client/v4/accounts/account-1/email/sending/suppressions*' => Http::response([
+            'success' => true,
+            'result_info' => ['next_cursor' => null],
             'result' => [[
                 'id' => 'suppression-command',
                 'email' => 'person@example.com',
                 'reason' => 'hard_bounce',
                 'created_at' => '2026-04-25T10:00:00Z',
                 'expires_at' => null,
-                'zones' => ['example.com'],
+                'scope' => ['type' => 'sending_domain', 'value' => 'example.com'],
             ]],
         ]),
     ]);
@@ -150,17 +152,16 @@ it('ignores malformed event lists without failing the whole fetch', function ():
                 ],
             ],
         ]),
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
+        'api.cloudflare.com/client/v4/accounts/account-1/email/sending/suppressions*' => Http::response([
+            'success' => true,
+            'result_info' => ['next_cursor' => null],
             'result' => [[
                 'id' => 'suppression-command',
                 'email' => 'person@example.com',
                 'reason' => 'hard_bounce',
                 'created_at' => '2026-04-25T10:00:00Z',
                 'expires_at' => null,
-                'zones' => ['example.com'],
+                'scope' => ['type' => 'sending_domain', 'value' => 'example.com'],
             ]],
         ]),
     ]);
@@ -183,17 +184,16 @@ it('skips malformed items inside Cloudflare event lists', function (): void {
                 ],
             ],
         ]),
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
+        'api.cloudflare.com/client/v4/accounts/account-1/email/sending/suppressions*' => Http::response([
+            'success' => true,
+            'result_info' => ['next_cursor' => null],
             'result' => [[
                 'id' => 'suppression-command',
                 'email' => 'person@example.com',
                 'reason' => 'hard_bounce',
                 'created_at' => '2026-04-25T10:00:00Z',
                 'expires_at' => null,
-                'zones' => ['example.com'],
+                'scope' => ['type' => 'sending_domain', 'value' => 'example.com'],
             ]],
         ]),
     ]);
@@ -230,17 +230,16 @@ it('fetch command stores events synchronously', function (): void {
                 ],
             ],
         ]),
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
+        'api.cloudflare.com/client/v4/accounts/account-1/email/sending/suppressions*' => Http::response([
+            'success' => true,
+            'result_info' => ['next_cursor' => null],
             'result' => [[
                 'id' => 'suppression-command',
                 'email' => 'person@example.com',
                 'reason' => 'hard_bounce',
                 'created_at' => '2026-04-25T10:00:00Z',
                 'expires_at' => null,
-                'zones' => ['example.com'],
+                'scope' => ['type' => 'sending_domain', 'value' => 'example.com'],
             ]],
         ]),
     ]);
@@ -266,17 +265,16 @@ it('fetch job stores events with a requested lookback range', function (): void 
                 ],
             ],
         ]),
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
+        'api.cloudflare.com/client/v4/accounts/account-1/email/sending/suppressions*' => Http::response([
+            'success' => true,
+            'result_info' => ['next_cursor' => null],
             'result' => [[
                 'id' => 'suppression-job',
                 'email' => 'person@example.com',
                 'reason' => 'hard_bounce',
                 'created_at' => '2026-04-25T10:00:00Z',
                 'expires_at' => null,
-                'zones' => ['example.com'],
+                'scope' => ['type' => 'sending_domain', 'value' => 'example.com'],
             ]],
         ]),
     ]);
@@ -302,10 +300,9 @@ it('fetch job stores events with the default configured range', function (): voi
                 ],
             ],
         ]),
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 0,
+        'api.cloudflare.com/client/v4/accounts/account-1/email/sending/suppressions*' => Http::response([
+            'success' => true,
+            'result_info' => ['next_cursor' => null],
             'result' => [],
         ]),
     ]);
@@ -379,4 +376,29 @@ it('prunes events through the package prune command', function (): void {
         ->and(CloudflareMailSuppression::query()->count())->toBe(0);
 
     CarbonImmutable::setTestNow();
+});
+
+it('preserves events and reports suppression failures without failing the command', function (int $status): void {
+    Exceptions::fake();
+    Http::fake([
+        '*/graphql' => Http::response(['data' => ['viewer' => ['zones' => [[
+            'emailSendingAdaptive' => [['datetime' => '2026-04-25T10:15:00Z', 'messageId' => 'partial-success']],
+        ]]]]]),
+        '*/accounts/account-1/email/sending/suppressions*' => Http::response(['success' => false], $status),
+    ]);
+    $this->artisan('cloudflare-mail-monitor:fetch')
+        ->expectsOutputToContain('Stored 1 Cloudflare mail event(s).')
+        ->expectsOutputToContain('suppression sync is incomplete')
+        ->assertSuccessful();
+    expect(CloudflareMailEvent::query()->where('message_id', 'partial-success')->exists())->toBeTrue();
+    Exceptions::assertReported(CloudflareApiException::class);
+})->with([403, 503]);
+
+it('keeps suppression failures retryable in queued jobs', function (): void {
+    Http::fake([
+        '*/graphql' => Http::response(['data' => ['viewer' => ['zones' => [['emailSendingAdaptive' => []]]]]]),
+        '*/accounts/account-1/email/sending/suppressions*' => Http::response([], 403),
+    ]);
+    expect(fn () => app(FetchCloudflareMailEvents::class)->handle(app(CloudflareMailEventFetcher::class), app(CloudflareMailSuppressionFetcher::class)))
+        ->toThrow(CloudflareApiException::class);
 });

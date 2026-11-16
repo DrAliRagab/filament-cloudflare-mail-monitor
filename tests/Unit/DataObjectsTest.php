@@ -123,3 +123,16 @@ it('normalizes unusual Cloudflare suppression payload values defensively', funct
 
     CarbonImmutable::setTestNow();
 });
+
+it('preserves suppression expiration and supports the original DTO constructor', function (): void {
+    $zone = new ConfiguredZone('zone-1', 'example.com');
+    $emailSuppressionData = EmailSuppressionData::fromCloudflare($zone, [
+        'id' => 'one', 'email' => 'person@example.com', 'reason' => 'manual',
+        'created_at' => '2026-11-12T14:06:42.468Z', 'expires_at' => '2026-11-19T14:06:43Z',
+        'scope' => ['type' => 'sending_domain', 'value' => 'mail.example.com'], 'read_only' => false,
+    ]);
+    expect($emailSuppressionData->expiresAt?->toIso8601String())->toBe('2026-11-19T14:06:43+00:00')
+        ->and($emailSuppressionData->readOnly)->toBeFalse()->and($emailSuppressionData->zones)->toBe(['mail.example.com']);
+    $legacy = new EmailSuppressionData($zone, $emailSuppressionData->id, $emailSuppressionData->email, $emailSuppressionData->reason, $emailSuppressionData->createdAt, $emailSuppressionData->expiresAt, ['example.com'], []);
+    expect($legacy->scopeType)->toBeNull()->and($legacy->scopeValue)->toBeNull()->and($legacy->readOnly)->toBeNull();
+});

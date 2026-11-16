@@ -545,22 +545,22 @@ it('exposes a refresh action on the suppressions list page', function (): void {
 
 it('refreshes the suppressions list page cache after fetching', function (): void {
     config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.account_id', 'account-1');
     config()->set('cloudflare-mail-monitor.zones', [
         ['id' => 'zone-1', 'name' => 'example.com'],
     ]);
 
     Http::fake([
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
+        'api.cloudflare.com/client/v4/accounts/account-1/email/sending/suppressions*' => Http::response([
+            'success' => true,
+            'result_info' => ['next_cursor' => null],
             'result' => [[
                 'id' => 'suppression-1',
                 'email' => 'person@example.com',
                 'reason' => 'hard_bounce',
                 'created_at' => '2026-04-25T10:00:00Z',
                 'expires_at' => null,
-                'zones' => ['example.com'],
+                'scope' => ['type' => 'sending_domain', 'value' => 'example.com'],
             ]],
         ]),
     ]);
@@ -581,6 +581,7 @@ it('exposes a refresh action on the suppression detail page', function (): void 
 
 it('refreshes the current suppression record after fetching', function (): void {
     config()->set('cloudflare-mail-monitor.api.token', 'secret-token');
+    config()->set('cloudflare-mail-monitor.account_id', 'account-1');
     config()->set('cloudflare-mail-monitor.zones', [
         ['id' => 'zone-1', 'name' => 'example.com'],
     ]);
@@ -595,17 +596,16 @@ it('refreshes the current suppression record after fetching', function (): void 
     ]);
 
     Http::fake([
-        'api.cloudflare.com/client/v4/zones/zone-1/email/sending/suppression*' => Http::response([
-            'page' => 1,
-            'per_page' => 100,
-            'total' => 1,
+        'api.cloudflare.com/client/v4/accounts/account-1/email/sending/suppressions*' => Http::response([
+            'success' => true,
+            'result_info' => ['next_cursor' => null],
             'result' => [[
                 'id' => 'suppression-1',
                 'email' => 'person@example.com',
                 'reason' => 'manual',
                 'created_at' => '2026-04-25T10:00:00Z',
                 'expires_at' => null,
-                'zones' => ['example.com'],
+                'scope' => ['type' => 'sending_domain', 'value' => 'example.com'],
             ]],
         ]),
     ]);
@@ -620,6 +620,11 @@ it('refreshes the current suppression record after fetching', function (): void 
 it('builds the email suppression infolist', function (): void {
     $schema = CloudflareMailSuppressionResource::infolist(Schema::make());
     $components = $schema->getComponents();
+
+    $entries = collect($components)->keyBy(fn ($entry): ?string => $entry->getName());
+    expect($entries->keys()->all())->toContain('scope_type', 'scope_value', 'read_only');
+    expect($entries['read_only']->formatState(true))->toBe('Yes')
+        ->and($entries['read_only']->formatState(false))->toBe('No');
 
     expect($components)->not->toBeEmpty()
         ->and(CloudflareMailSuppressionResource::formatStringList(['example.com', 123, []]))->toBe('example.com, 123')

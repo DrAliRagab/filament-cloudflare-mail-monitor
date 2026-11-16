@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 return [
+    'account_id' => env('CLOUDFLARE_MAIL_MONITOR_ACCOUNT_ID') ?: env('CLOUDFLARE_ACCOUNT_ID'),
+
     'api' => [
         'base_url' => env('CLOUDFLARE_MAIL_MONITOR_API_BASE_URL', 'https://api.cloudflare.com/client/v4'),
         'token' => env('CLOUDFLARE_MAIL_MONITOR_API_TOKEN'),

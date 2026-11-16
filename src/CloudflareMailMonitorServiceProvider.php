@@ -23,6 +23,7 @@ final class CloudflareMailMonitorServiceProvider extends PackageServiceProvider
             ->hasMigrations([
                 'create_cloudflare_mail_monitor_events_table',
                 'create_cloudflare_mail_monitor_suppressions_table',
+                'update_cloudflare_mail_monitor_suppressions_scope_columns',
             ])
             ->hasCommands([
                 FetchCloudflareMailEventsCommand::class,

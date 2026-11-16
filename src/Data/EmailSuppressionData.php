@@ -22,6 +22,9 @@ final readonly class EmailSuppressionData
         public ?CarbonImmutable $expiresAt,
         public array $zones,
         public array $raw,
+        public ?string $scopeType = null,
+        public ?string $scopeValue = null,
+        public ?bool $readOnly = null,
     ) {}
 
     /**
@@ -29,6 +32,10 @@ final readonly class EmailSuppressionData
      */
     public static function fromCloudflare(ConfiguredZone $configuredZone, array $payload): self
     {
+        $scope = $payload['scope'] ?? [];
+        $scopeType = is_array($scope) && is_string($scope['type'] ?? null) ? $scope['type'] : null;
+        $scopeValue = is_array($scope) && is_string($scope['value'] ?? null) ? $scope['value'] : null;
+
         return new self(
             zone: $configuredZone,
             id: self::string($payload['id'] ?? null),
@@ -36,8 +43,15 @@ final readonly class EmailSuppressionData
             reason: self::string($payload['reason'] ?? null),
             createdAt: self::dateTime($payload['created_at'] ?? null),
             expiresAt: self::nullableDateTime($payload['expires_at'] ?? null),
-            zones: self::stringList($payload['zones'] ?? []),
+            zones: match ($scopeType) {
+                'account' => ['*'],
+                'sending_domain' => $scopeValue === null ? [] : [$scopeValue],
+                default => self::stringList($payload['zones'] ?? []),
+            },
             raw: $payload,
+            scopeType: $scopeType,
+            scopeValue: $scopeValue,
+            readOnly: is_bool($payload['read_only'] ?? null) ? $payload['read_only'] : null,
         );
     }
 
@@ -56,6 +70,9 @@ final readonly class EmailSuppressionData
             'zone_name' => $this->zone->name,
             'cloudflare_zones' => $this->zones,
             'raw' => $this->raw,
+            'scope_type' => $this->scopeType,
+            'scope_value' => $this->scopeValue,
+            'read_only' => $this->readOnly,
         ];
     }
 
