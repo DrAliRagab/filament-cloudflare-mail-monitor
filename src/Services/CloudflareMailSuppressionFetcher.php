@@ -21,20 +21,33 @@ final readonly class CloudflareMailSuppressionFetcher
 
     public function fetch(): int
     {
+        $zones = array_map(ConfiguredZone::fromArray(...), Config::zones());
+
+        if ($zones === []) {
+            return 0;
+        }
+
+        $accountId = Config::string('account_id');
+
+        if ($accountId === null || trim($accountId) === '') {
+            throw MissingCloudflareConfiguration::accountId();
+        }
+
+        foreach ($zones as $zone) {
+            if ($zone->name === null || trim($zone->name) === '') {
+                throw MissingCloudflareConfiguration::zoneName($zone->id);
+            }
+        }
+
         $stored = 0;
 
-        foreach (Config::zones() as $zoneConfig) {
-            $zone = ConfiguredZone::fromArray($zoneConfig);
-
-            foreach ($this->suppressionsForZone($zone) as $suppression) {
+        foreach ($this->suppressionsForAccount($accountId) as $payload) {
+            foreach ($this->zonesForSuppression($zones, $payload) as $zone) {
+                $suppression = EmailSuppressionData::fromCloudflare($zone, $payload);
                 CloudflareMailSuppression::query()->updateOrCreate(
-                    [
-                        'zone_id' => $suppression->zone->id,
-                        'suppression_id' => $suppression->id,
-                    ],
+                    ['zone_id' => $zone->id, 'suppression_id' => $suppression->id],
                     $suppression->toDatabaseAttributes(),
                 );
-
                 ++$stored;
             }
         }
@@ -43,40 +56,76 @@ final readonly class CloudflareMailSuppressionFetcher
     }
 
     /**
-     * @return list<EmailSuppressionData>
+     * @param  list<ConfiguredZone>  $zones
+     * @param  array<string, mixed>  $payload
+     * @return list<ConfiguredZone>
      */
-    private function suppressionsForZone(ConfiguredZone $configuredZone): array
+    private function zonesForSuppression(array $zones, array $payload): array
     {
-        $page = 1;
+        if (Arr::get($payload, 'scope.type') === 'account') {
+            return $zones;
+        }
+
+        $domain = Arr::get($payload, 'scope.value');
+        if (Arr::get($payload, 'scope.type') !== 'sending_domain' || ! is_string($domain)) {
+            return [];
+        }
+
+        $domain = strtolower(rtrim($domain, '.'));
+        $match = null;
+        $matchLength = 0;
+        foreach ($zones as $zone) {
+            $name = strtolower(rtrim(trim((string) $zone->name), '.'));
+            if ($name !== '' && ($domain === $name || str_ends_with($domain, '.'.$name)) && strlen($name) > $matchLength) {
+                $match = $zone;
+                $matchLength = strlen($name);
+            }
+        }
+
+        return $match === null ? [] : [$match];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function suppressionsForAccount(string $accountId): array
+    {
         $perPage = min(max(Config::integer('suppressions.page_size', 100), 1), 1000);
+        $cursor = null;
+        $seen = [];
         $suppressions = [];
 
         do {
-            $payload = $this->get(sprintf('/zones/%s/email/sending/suppression', rawurlencode($configuredZone->id)), [
-                'page' => $page,
-                'per_page' => $perPage,
-                'order' => 'created_at',
-                'direction' => 'desc',
-            ]);
+            $query = ['per_page' => $perPage];
+            if ($cursor !== null) {
+                $query['cursor'] = $cursor;
+            }
 
-            $result = Arr::get($payload, 'result', []);
-
-            if (! is_array($result)) {
+            $payload = $this->get(sprintf('/accounts/%s/email/sending/suppressions', rawurlencode($accountId)), $query);
+            $result = $payload['result'] ?? null;
+            if (($payload['success'] ?? true) !== true || ! is_array($result) || ! array_is_list($result)) {
                 throw CloudflareApiException::forMalformedRestResponse();
             }
 
             foreach ($result as $suppression) {
-                if (! is_array($suppression)) {
-                    continue;
+                if (is_array($suppression)) {
+                    $suppressions[] = $this->stringKeyedArray($suppression);
                 }
-
-                $suppressions[] = EmailSuppressionData::fromCloudflare($configuredZone, $this->stringKeyedArray($suppression));
             }
 
-            $total = $this->integer(Arr::get($payload, 'total'), count($suppressions));
-            $currentPageCount = count($result);
-            ++$page;
-        } while ($currentPageCount === $perPage && count($suppressions) < $total);
+            $cursor = Arr::get($payload, 'result_info.next_cursor');
+            if ($cursor === '') {
+                $cursor = null;
+            }
+
+            if ($cursor !== null) {
+                if (! is_string($cursor) || in_array($cursor, $seen, true)) {
+                    throw CloudflareApiException::forMalformedRestResponse();
+                }
+
+                $seen[] = $cursor;
+            }
+        } while ($cursor !== null);
 
         return $suppressions;
     }
@@ -135,18 +184,5 @@ final readonly class CloudflareMailSuppressionFetcher
         }
 
         return $stringKeyed;
-    }
-
-    private function integer(mixed $value, int $default): int
-    {
-        if (is_int($value)) {
-            return $value;
-        }
-
-        if (is_string($value) && is_numeric($value)) {
-            return (int) $value;
-        }
-
-        return $default;
     }
 }

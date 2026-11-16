@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DrAliRagab\FilamentCloudflareMailMonitor\Commands;
 
 use DrAliRagab\FilamentCloudflareMailMonitor\Data\DateRange;
+use DrAliRagab\FilamentCloudflareMailMonitor\Exceptions\CloudflareApiException;
 use DrAliRagab\FilamentCloudflareMailMonitor\Jobs\FetchCloudflareMailEvents;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailEventFetcher;
 use DrAliRagab\FilamentCloudflareMailMonitor\Services\CloudflareMailSuppressionFetcher;
@@ -45,9 +46,17 @@ final class FetchCloudflareMailEventsCommand extends Command
         }
 
         $stored = $cloudflareMailEventFetcher->fetch($range);
-        $storedSuppressions = $cloudflareMailSuppressionFetcher->fetch();
 
         $this->components->info(sprintf('Stored %d Cloudflare mail event(s).', $stored));
+        try {
+            $storedSuppressions = $cloudflareMailSuppressionFetcher->fetch();
+        } catch (CloudflareApiException $cloudflareApiException) {
+            report($cloudflareApiException);
+            $this->components->warn('Events imported, but suppression sync is incomplete: '.$cloudflareApiException->getMessage());
+
+            return self::SUCCESS;
+        }
+
         $this->components->info(sprintf('Stored %d Cloudflare mail suppression(s).', $storedSuppressions));
 
         return self::SUCCESS;

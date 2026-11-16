@@ -104,7 +104,7 @@ final class CloudflareMailEventResource extends Resource
                 SelectFilter::make('dmarc')->options(['pass' => 'Pass', 'fail' => 'Fail']),
                 SelectFilter::make('spf')->options(['pass' => 'Pass', 'fail' => 'Fail']),
                 Filter::make('occurred_at')
-                    ->schema([
+                    ->form([
                         DatePicker::make('from')->label('From'),
                         DatePicker::make('until')->label('Until'),
                     ])

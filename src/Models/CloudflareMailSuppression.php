@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
 
 /**
+ * @property string|null $scope_type
+ * @property string|null $scope_value
+ * @property bool|null $read_only
  * @property int $id
  * @property string $suppression_id
  * @property string $zone_id
@@ -50,6 +53,9 @@ final class CloudflareMailSuppression extends Model
         'expires_at',
         'cloudflare_zones',
         'raw',
+        'scope_type',
+        'scope_value',
+        'read_only',
     ];
 
     /**
@@ -63,6 +69,7 @@ final class CloudflareMailSuppression extends Model
             'expires_at' => 'immutable_datetime',
             'cloudflare_zones' => 'array',
             'raw' => 'array',
+            'read_only' => 'boolean',
         ];
     }
 
