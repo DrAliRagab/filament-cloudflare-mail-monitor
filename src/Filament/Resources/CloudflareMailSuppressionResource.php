@@ -89,7 +89,7 @@ final class CloudflareMailSuppressionResource extends Resource
                 SelectFilter::make('zone_id')->label('Zone')->attribute('zone_id')->options(self::zoneFilterOptions()),
                 SelectFilter::make('reason')->options(fn (): array => self::reasonFilterOptions()),
                 Filter::make('suppressed_at')
-                    ->schema([
+                    ->form([
                         DatePicker::make('from')->label('From'),
                         DatePicker::make('until')->label('Until'),
                     ])
